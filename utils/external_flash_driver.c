@@ -23,24 +23,16 @@ static ext_flash_status_reg_t   ext_flash_status_reg = {0};
 
 static void ExtFlashSpiInit()
 {
-    nrf_gpio_cfg_input(EXT_FLASH_MISO_PIN, NRF_GPIO_PIN_NOPULL);
-    nrf_gpio_cfg_output(EXT_FLASH_MOSI_PIN);
-    nrf_gpio_cfg_output(EXT_FLASH_SCK_PIN);
+    SpiConfig(EXT_FLASH_SPI_PERIPH,
+              SPI_FREQUENCY_FREQUENCY_M8,
+              SPI_CONFIG_ORDER_MsbFirst,
+              SPI_CONFIG_CPHA_Leading,
+              SPI_CONFIG_CPOL_ActiveHigh,
+              EXT_FLASH_CS_PIN
+            );
 
-    EXT_FLASH_SPI_PERIPH->PSELSCK = EXT_FLASH_SCK_PIN;
-    EXT_FLASH_SPI_PERIPH->PSELMOSI = EXT_FLASH_MOSI_PIN;
-    EXT_FLASH_SPI_PERIPH->PSELMISO = EXT_FLASH_MISO_PIN;
+    SpiEnable(EXT_FLASH_SPI_PERIPH);
 
-    /// Clear configuration
-    EXT_FLASH_SPI_PERIPH->CONFIG = 0;
-
-    /// Set the CPHA0 and CPOL0 and MSB bit first
-    EXT_FLASH_SPI_PERIPH->CONFIG = (SPI_CONFIG_CPHA_Leading << SPI_CONFIG_CPHA_Pos) | (SPI_CONFIG_CPOL_ActiveHigh << SPI_CONFIG_CPOL_Pos) | (SPI_CONFIG_ORDER_MsbFirst << SPI_CONFIG_ORDER_Pos);
-
-    /// Set the Display SPI CLK freqency to 8 MHz
-    EXT_FLASH_SPI_PERIPH->FREQUENCY = SPI_FREQUENCY_FREQUENCY_M8;
-
-    EXT_FLASH_SPI_PERIPH->INTENSET = SPI_INTENSET_READY_Enabled<<SPI_INTENSET_READY_Pos;
 }
 
 uint32_t ExtFlashInit()
@@ -48,10 +40,7 @@ uint32_t ExtFlashInit()
     ExtFlashSpiInit();
 
     nrf_gpio_cfg_output(EXT_FLASH_ENABLE_PIN);
-    NRF_GPIO->OUTSET = 1 << EXT_FLASH_ENABLE_PIN;
-
-    nrf_gpio_cfg_output(EXT_FLASH_CS_PIN);
-    NRF_GPIO->OUTSET = 1 << EXT_FLASH_CS_PIN;
+    nrf_gpio_pin_clear(EXT_FLASH_ENABLE_PIN);
 
     return NRF_SUCCESS;
 }
@@ -66,7 +55,7 @@ uint32_t ExtFlashTurnOn(ext_flash_operation_type_e read_or_erase)
 {
     if(ext_flash_on == 0)
     {
-        NRF_GPIO->OUTCLR = 1 << EXT_FLASH_ENABLE_PIN;
+        nrf_gpio_pin_clear(EXT_FLASH_ENABLE_PIN);
         ext_flash_on = 1;
         if(read_or_erase == EXT_FLASH_READ_OP)
             RTCDelay(NRF_RTC1, RTC1_US_TO_TICKS(EXT_FLASH_TURN_ON_DELAY_READ_US));
@@ -86,7 +75,7 @@ uint32_t ExtFlashTurnOff()
 {
     if(ext_flash_on == 1)
     {
-        NRF_GPIO->OUTSET = 1 << EXT_FLASH_ENABLE_PIN;
+        nrf_gpio_pin_set(EXT_FLASH_ENABLE_PIN);
         ext_flash_on = 0;
 
         return NRF_SUCCESS;

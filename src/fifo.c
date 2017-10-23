@@ -50,6 +50,22 @@ inline void FifoGet(app_fifo_t* fifo, uint8_t* byte)
 }
 
 /**
+ * \brief This function peeks the byte at index (cur read index - index)
+ * @param fifo
+ * @param byte
+ */
+inline uint8_t FifoPeek(app_fifo_t* fifo, uint16_t index)
+{
+    int diff = fifo->read_pos - index;
+    if (diff < 0)
+    {
+        diff += fifo->buf_size_mask;
+    }
+
+    return fifo->p_buf[fifo->read_pos - index];
+}
+
+/**
  * \brief Put the byte in the fifo
  *
  * \param fifo - the FIFO where the byte is to be put

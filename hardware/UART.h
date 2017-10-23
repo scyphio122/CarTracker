@@ -21,7 +21,7 @@ void UartDisable();
 
 e_uart_error UartSendDataSync(uint8_t* dataToSend, uint32_t dataSize);
 e_uart_error UartReadDataNumberSync(uint8_t* dataBuffer, uint32_t dataSize);
-e_uart_error UartReadDataEndCharSync(uint8_t* dataBuffer, uint8_t endChar);
+e_uart_error UartReadDataWithPatternSync(uint8_t* dataBuffer, uint8_t* endWord, uint8_t endWordSize);
 
 
 

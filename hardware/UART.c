@@ -14,6 +14,8 @@
 #include "nrf_gpio.h"
 #include "nrf_clock.h"
 #include "core_cm4.h"
+#include "fifo.h"
+#include <app_fifo.h>
 
 static uint32_t 				s_uartBytesToSend;
 static volatile uint32_t 		s_uartBytesSent;
@@ -22,12 +24,17 @@ static uint8_t* 				s_uartTXBufferPtr;
 
 static uint32_t 				s_uartBytesToRead;
 static volatile uint32_t 		s_uartBytesRead;
-static volatile bool			s_uartDataReadFlag;
+static volatile bool			s_uartDataReadFinishedFlag;
 static uint8_t* 				s_uartRXBufferPtr;
 static volatile bool			s_uartReadAsyncCurUsed = 0;
 static volatile uint8_t			s_uartReadEndCharacter;
+static volatile bool            s_uartIsReading = false;
 static volatile bool 			s_uartIsReadEndCharacterUsed;
+
 static volatile e_uart_error 	s_uartErrno;
+
+static uint8_t                  s_uartRxFifoBuf[1024];
+static app_fifo_t               s_uartRxFifo;
 
 void UARTE0_UART0_IRQHandler()
 {
@@ -36,16 +43,24 @@ void UARTE0_UART0_IRQHandler()
 		NRF_UART0->EVENTS_RXDRDY = 0;
 		static uint8_t rxChar;
 		rxChar = NRF_UART0->RXD;
-		s_uartRXBufferPtr[s_uartBytesRead++] = rxChar;
 
-		if((s_uartIsReadEndCharacterUsed && rxChar == s_uartReadEndCharacter) || s_uartBytesRead == s_uartBytesToRead)
+		if (!s_uartIsReading)
 		{
-			NRF_UART0->INTENCLR = UART_INTENCLR_RXDRDY_Msk;
-			s_uartDataReadFlag = true;
+		    FifoPut(&s_uartRxFifo, rxChar);
+		}
+		else
+		{
+            s_uartRXBufferPtr[s_uartBytesRead++] = rxChar;
 
-			///	If asynchroneous read has ended clear the flag to inform main context about this
-			if(s_uartReadAsyncCurUsed)
-				s_uartReadAsyncCurUsed = false;
+            if((s_uartIsReadEndCharacterUsed && rxChar == s_uartReadEndCharacter) || s_uartBytesRead == s_uartBytesToRead)
+            {
+                NRF_UART0->INTENCLR = UART_INTENCLR_RXDRDY_Msk;
+                s_uartDataReadFinishedFlag = true;
+
+                ///	If asynchroneous read has ended clear the flag to inform main context about this
+                if(s_uartReadAsyncCurUsed)
+                    s_uartReadAsyncCurUsed = false;
+            }
 		}
 	}
 
@@ -81,14 +96,15 @@ e_uart_error UartReadDataNumberSync(uint8_t* dataBuffer, uint32_t dataSize)
 	s_uartBytesRead = 0;
 	s_uartBytesToRead = dataSize;
 	s_uartRXBufferPtr = dataBuffer;
-	s_uartDataReadFlag = false;
+	s_uartDataReadFinishedFlag = false;
 	s_uartReadAsyncCurUsed = false;
 	s_uartIsReadEndCharacterUsed = false;
+	s_uartIsReading = true;
 
 	NRF_UART0->INTENSET = UART_INTENSET_RXDRDY_Msk;
 	NRF_UART0->TASKS_STARTRX = 1;
 
-	while(!s_uartDataReadFlag)
+	while(!s_uartDataReadFinishedFlag)
 	{
 #if SOFTDEVICE_ENABLED
 		sd_app_evt_wait();
@@ -97,12 +113,14 @@ e_uart_error UartReadDataNumberSync(uint8_t* dataBuffer, uint32_t dataSize)
 #endif
 	}
 
-	NRF_UART0->TASKS_STARTRX = 1;
+    NRF_UART0->TASKS_STOPRX = 1;
+    s_uartIsReading = false;
+
 
 	return s_uartErrno;
 }
 
-e_uart_error UartReadDataEndCharSync(uint8_t* dataBuffer, uint8_t endChar)
+e_uart_error UartReadDataWithPatternSync(uint8_t* dataBuffer, uint8_t* endWord, uint8_t endWordSize)
 {
 	///	Check if currently async uart read is not in use - if is, wait till it ends
 	while(s_uartReadAsyncCurUsed)
@@ -118,24 +136,42 @@ e_uart_error UartReadDataEndCharSync(uint8_t* dataBuffer, uint8_t endChar)
 	s_uartBytesRead = 0;
 	s_uartBytesToRead = 0;
 	s_uartRXBufferPtr = dataBuffer;
-	s_uartDataReadFlag = false;
+	s_uartDataReadFinishedFlag = false;
 	s_uartReadAsyncCurUsed = false;
 	s_uartIsReadEndCharacterUsed = true;
-	s_uartReadEndCharacter = endChar;
+    s_uartIsReading = true;
 
 	NRF_UART0->INTENSET = UART_INTENSET_RXDRDY_Msk;
 	NRF_UART0->TASKS_STARTRX = 1;
 
-	while(!s_uartDataReadFlag)
+	bool dataReceiving = true;
+	uint16_t matchingCount = 0;
+	while (dataReceiving)
 	{
 #if SOFTDEVICE_ENABLED
 		sd_app_evt_wait();
 #else
 		__WFE();
 #endif
+		for (uint8_t i=0; i<endWordSize; ++i)
+		{
+		    if (s_uartBytesRead >= (endWordSize - 1))
+		    {
+                if (endWord[i] == s_uartRXBufferPtr[s_uartBytesRead - endWordSize - i - 1])
+                {
+                    matchingCount++;
+                }
+
+                if (matchingCount == endWordSize)
+                {
+                    dataReceiving = false;
+                }
+		    }
+		}
 	}
 
-	NRF_UART0->TASKS_STARTRX = 1;
+	NRF_UART0->TASKS_STOPRX = 1;
+    s_uartIsReading = false;
 
 	return s_uartErrno;
 }
@@ -147,6 +183,7 @@ e_uart_error UartSendDataSync(uint8_t* dataToSend, uint32_t dataSize)
 	s_uartTXBufferPtr = dataToSend;
 	s_uartMessageSentFlag = false;
 	s_uartErrno = UART_NO_ERROR;
+    s_uartIsReading = false;
 
 	NRF_UART0->INTENSET = UART_INTENSET_TXDRDY_Msk;
 	NRF_UART0->TASKS_STARTTX = 1;
@@ -250,4 +287,5 @@ void UartConfig(uint32_t baudrateBitfield, uint32_t parity, uint32_t hardwareFlo
 		NRF_UART0->PSELRTS = UART_RTS_PIN;
 	}
 
+	FifoInit(&s_uartRxFifo, s_uartRxFifoBuf, sizeof(s_uartRxFifoBuf));
 }

@@ -8,6 +8,11 @@
 #ifndef INC_PINOUT_H_
 #define INC_PINOUT_H_
 
+/** ######## DEBUG PINS ######## **/
+#define TRACE_SWO_PIN_PIN       (uint8_t)(18)
+#define DEBUG_1_PIN_PIN         (uint8_t)(22)
+#define DEBUG_2_PIN_PIN         (uint8_t)(23)
+
 /**< ########### UART ############# **/
 #define UART_RX_PIN 	        (uint8_t)29
 #define UART_TX_PIN		        (uint8_t)28
@@ -69,10 +74,7 @@
 #define EXT_FLASH_MISO_PIN      SPI1_MISO_PIN
 #define EXT_FLASH_SPI_PERIPH    NRF_SPI1
 
-/** ######## DEBUG PINS ######## **/
-#define TRACE_SWO_PIN_PIN       (uint8_t)(18)
-#define DEBUG_1_PIN_PIN         (uint8_t)(22)
-#define DEBUG_2_PIN_PIN         (uint8_t)(23)
+
 
 
 

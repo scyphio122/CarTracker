@@ -44,7 +44,7 @@ inline void FifoClear(app_fifo_t* fifo)
  * \param fifo - the fifo from which the byte is to be extracted
  * \param byte - pointer to the single byte buffer
  */
-inline void FifoGet(app_fifo_t* fifo, uint8_t* byte)
+inline void FifoGet(app_fifo_t* fifo, void* byte)
 {
     app_fifo_get(fifo, byte);
 }
@@ -56,13 +56,13 @@ inline void FifoGet(app_fifo_t* fifo, uint8_t* byte)
  */
 inline uint8_t FifoPeek(app_fifo_t* fifo, uint16_t index)
 {
-    int diff = fifo->read_pos - index;
+    int diff = fifo->write_pos - index - 1;
     if (diff < 0)
     {
         diff += fifo->buf_size_mask;
     }
 
-    return fifo->p_buf[fifo->read_pos - index];
+    return fifo->p_buf[diff];
 }
 
 /**

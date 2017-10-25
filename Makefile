@@ -14,7 +14,7 @@ SIZE = arm-none-eabi-size
 OPTIMIZATION = -O0
 BUILD_FOLDER = Build_Output
 OUTPUT_BINARY_FOLDER = $(BUILD_FOLDER)
-OUTPUT_BINARY_NAME = Car_Tracker
+OUTPUT_BINARY_NAME = CarTracker
 LINKER_SCRIPT = armgcc_s132_nrf52832_xxaa.ld
 LINKER_COMMON_SCRIPT = nrf5x_common.ld
 
@@ -51,6 +51,8 @@ C_SOURCE_FILES += src/fifo.c
 C_SOURCE_FILES += utils/crypto.c
 C_SOURCE_FILES += utils/external_flash_driver.c
 C_SOURCE_FILES += utils/file_system.c
+C_SOURCE_FILES += utils/gps.c
+C_SOURCE_FILES += utils/gsm.c
 C_SOURCE_FILES += hardware/Systick.c
 C_SOURCE_FILES += hardware/UART.c
 C_SOURCE_FILES += hardware/SPI.c 
@@ -132,8 +134,8 @@ LDFLAGS += -Xlinker -Map=$(OUTPUT_BINARY_FOLDER)/$(OUTPUT_BINARY_NAME).map
 LDFLAGS += -Wl,--gc-sections
 LDFLAGS += -T"$(nRF52_SDK)/$(LINKER_SCRIPT)"
 LDFLAGS += -L"$(nRF52_SDK)"
-LDFLAGS += -L/home/konrad/Projects/Bare_Metal/Car_Tracker/libs/hard
-LDFLAGS += -L/home/konrad/Projects/Bare_Metal/Car_Tracker/libs
+LDFLAGS += -L/home/konrad/Projects/Bare_Metal/SecuCar/Car_Tracker/libs/hard
+LDFLAGS += -L/home/konrad/Projects/Bare_Metal/SecuCar/Car_Tracker/libs
 LDFLAGS += --specs=nano.specs -lc -lnosys
 LDFLAGS += -lgcc
 

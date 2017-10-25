@@ -8,12 +8,26 @@
 #ifndef UTILS_GSM_H_
 #define UTILS_GSM_H_
 
-void GsmInit();
+#include <stdint-gcc.h>
+
+typedef enum
+{
+    GSM_OK,
+    GSM_ERROR
+}gsm_error_e;
+
+#define GSM_FIXED_BAUDRATE_SET      (uint32_t)(0xFFFFFFFE)
+
+void GsmGpsInit();
+
+void GsmBatteryOn();
+
+void GsmBatteryOff();
 
 void GsmPowerOn();
 
 void GsmPowerOff();
 
-void GsmUartSendCommand(void* command, uint16_t commandSize);
+gsm_error_e GsmUartSendCommand(void* command, uint16_t commandSize);
 
 #endif /* UTILS_GSM_H_ */

@@ -33,8 +33,8 @@ static volatile bool 			s_uartIsReadEndCharacterUsed;
 
 static volatile e_uart_error 	s_uartErrno;
 
-static uint8_t                  s_uartRxFifoBuf[1024];
-static app_fifo_t               s_uartRxFifo;
+static uint8_t                  uartRxFifoBuf[1024];
+app_fifo_t                      uartRxFifo;
 
 void UARTE0_UART0_IRQHandler()
 {
@@ -46,7 +46,7 @@ void UARTE0_UART0_IRQHandler()
 
 		if (!s_uartIsReading)
 		{
-		    FifoPut(&s_uartRxFifo, rxChar);
+		    FifoPut(&uartRxFifo, rxChar);
 		}
 		else
 		{
@@ -64,6 +64,20 @@ void UARTE0_UART0_IRQHandler()
 		}
 	}
 
+    if (NRF_UART0->EVENTS_CTS)
+    {
+        NRF_UART0->EVENTS_CTS = 0;
+        NRF_UART0->TASKS_STARTTX = 1;
+        NRF_UART0->EVENTS_TXDRDY = 1;
+    }
+    else if (NRF_UART0->EVENTS_NCTS)
+    {
+        NRF_UART0->EVENTS_NCTS = 0;
+        NRF_UART0->TASKS_STOPTX = 1;
+        NRF_UART0->EVENTS_TXDRDY = 0;
+        return;
+    }
+
 	if(NRF_UART0->EVENTS_TXDRDY)
 	{
 		NRF_UART0->EVENTS_TXDRDY = 0;
@@ -78,6 +92,7 @@ void UARTE0_UART0_IRQHandler()
 		}
 
 	}
+
 }
 
 e_uart_error UartReadDataNumberSync(uint8_t* dataBuffer, uint32_t dataSize)
@@ -185,8 +200,7 @@ e_uart_error UartSendDataSync(uint8_t* dataToSend, uint32_t dataSize)
 	s_uartErrno = UART_NO_ERROR;
     s_uartIsReading = false;
 
-	NRF_UART0->INTENSET = UART_INTENSET_TXDRDY_Msk;
-	NRF_UART0->TASKS_STARTTX = 1;
+    UartTxStart();
 	NRF_UART0->TXD = s_uartTXBufferPtr[s_uartBytesSent++];
 	//NVIC_SetPendingIRQ(UARTE0_UART0_IRQn);
 
@@ -215,12 +229,77 @@ e_uart_error UartSendDataSync(uint8_t* dataToSend, uint32_t dataSize)
 
 void UartEnable()
 {
-	NRF_UART0->ENABLE = UART_ENABLE_ENABLE_Msk;
+	NRF_UART0->ENABLE = UART_ENABLE_ENABLE_Enabled << UART_ENABLE_ENABLE_Pos;
 }
 
 void UartDisable()
 {
 	NRF_UART0->ENABLE = 0;
+}
+
+void UartRxStart()
+{
+    NRF_UART0->INTENSET = UARTE_INTENSET_RXDRDY_Set << UARTE_INTENSET_RXDRDY_Pos;
+    NRF_UART0->TASKS_STARTRX = 1;
+}
+
+void UartRxStop()
+{
+    NRF_UART0->INTENCLR = UARTE_INTENCLR_RXDRDY_Enabled << UARTE_INTENCLR_RXDRDY_Pos;
+    NRF_UART0->TASKS_STOPRX = 1;
+}
+
+void UartTxStart()
+{
+    NRF_UART0->INTENSET = UARTE_INTENSET_TXDRDY_Enabled << UARTE_INTENSET_TXDRDY_Pos;
+    NRF_UART0->TASKS_STARTTX = 1;
+}
+
+void UartTxStop()
+{
+    NRF_UART0->INTENCLR = UARTE_INTENCLR_TXDRDY_Enabled << UARTE_INTENCLR_TXDRDY_Pos;
+    NRF_UART0->TASKS_STOPTX = 1;
+}
+
+void UartEnableFlowCtrl()
+{
+    NRF_UART0->INTENSET = (UARTE_INTENSET_CTS_Enabled << UARTE_INTENSET_CTS_Pos) |
+                          (UARTE_INTENSET_NCTS_Enabled << UARTE_INTENSET_NCTS_Pos);
+    NRF_UART0->CONFIG |= UARTE_CONFIG_HWFC_Enabled << UARTE_CONFIG_HWFC_Pos;
+}
+
+void UartDisableFlowCtrl()
+{
+    NRF_UART0->INTENCLR = (UARTE_INTENCLR_CTS_Enabled << UARTE_INTENCLR_CTS_Pos) |
+                          (UARTE_INTENCLR_NCTS_Enabled << UARTE_INTENCLR_NCTS_Pos);
+    NRF_UART0->CONFIG &= ~(UARTE_CONFIG_HWFC_Disabled << UARTE_CONFIG_HWFC_Pos);
+}
+/**
+ * @brief This function changes the baudrate of the peripheral.
+ *
+ * @param baudrateBitfield - possible values:
+ *      UART_BAUDRATE_BAUDRATE_Baud1200
+ *      UART_BAUDRATE_BAUDRATE_Baud2400
+ *      UART_BAUDRATE_BAUDRATE_Baud4800
+ *      UART_BAUDRATE_BAUDRATE_Baud9600
+ *      UART_BAUDRATE_BAUDRATE_Baud14400
+ *      UART_BAUDRATE_BAUDRATE_Baud19200
+ *      UART_BAUDRATE_BAUDRATE_Baud28800
+ *      UART_BAUDRATE_BAUDRATE_Baud31250
+ *      UART_BAUDRATE_BAUDRATE_Baud38400
+ *      UART_BAUDRATE_BAUDRATE_Baud56000
+ *      UART_BAUDRATE_BAUDRATE_Baud57600
+ *      UART_BAUDRATE_BAUDRATE_Baud76800
+ *      UART_BAUDRATE_BAUDRATE_Baud115200
+ *      UART_BAUDRATE_BAUDRATE_Baud230400
+ *      UART_BAUDRATE_BAUDRATE_Baud250000
+ *      UART_BAUDRATE_BAUDRATE_Baud460800
+ *      UART_BAUDRATE_BAUDRATE_Baud921600
+ *      UART_BAUDRATE_BAUDRATE_Baud1M
+ */
+void UartChangeBaudrate(uint32_t baudrateBitfield)
+{
+    NRF_UART0->BAUDRATE = baudrateBitfield;
 }
 
 /**
@@ -287,5 +366,5 @@ void UartConfig(uint32_t baudrateBitfield, uint32_t parity, uint32_t hardwareFlo
 		NRF_UART0->PSELRTS = UART_RTS_PIN;
 	}
 
-	FifoInit(&s_uartRxFifo, s_uartRxFifoBuf, sizeof(s_uartRxFifoBuf));
+	FifoInit(&uartRxFifo, uartRxFifoBuf, sizeof(uartRxFifoBuf));
 }

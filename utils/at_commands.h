@@ -12,22 +12,22 @@
 /** ####### GENERAL COMMANDS ######### **/
 #define AT_GSM_ENABLE_HW_FLOW_CTRL          "AT+IFC=2,2"
 #define AT_GSM_GET_BAUD                     "AT+IPR?"
-#define AT_GSM_CHANGE_BAUD(baud)            "AT+IPR=" ## (baud)
+#define AT_GSM_CHANGE_BAUD(baud)            "AT+IPR=" #baud
 #define AT_GSM_GET_IMEI                     "AT+GSN"
 
 #define GSM_POWER_DOWN_MODE_URGENT          "0"
 #define GSM_POWER_DOWN_MODE_NORMAL          "1"
-#define AT_GSM_POWER_DOWN(mode)             "AT+QPOWD=" ## (mode)
+#define AT_GSM_POWER_DOWN(mode)             "AT+QPOWD=" mode
 
 #define GSM_ERROR_LOG_LEVEL_DISABLE         "0"
 #define GSM_ERROR_LOG_LEVEL_NUMERIC         "1"
 #define GSM_ERROR_LOG_LEVEL_STRING          "2"
-#define AT_GSM_ERROR_LOG_LEVEL(lvl)         "AT+CMEE=" ## (lvl)
+#define AT_GSM_ERROR_LOG_LEVEL(lvl)         "AT+CMEE=" lvl
 
 /** ####### GSM COMMANDS ######## **/
 #define AT_GSM_ENABLE_SIM_DETECTION         "AT+QSIMDET"
 #define AT_GSM_GET_PIN_STATUS               "AT+CPIN?"
-#define AT_GSM_SEND_PIN(pin)                "AT+CPIN=" ## (pin)
+#define AT_GSM_SEND_PIN(pin)                "AT+CPIN=" #pin
 
 #define AT_GSM_GET_REGISTERED_GSM_OPERATOR  "AT+COPS?"
 

@@ -37,10 +37,11 @@ static void ExtFlashSpiInit()
 
 uint32_t ExtFlashInit()
 {
+    nrf_gpio_cfg_output(EXT_FLASH_ENABLE_PIN);
+    nrf_gpio_pin_set(EXT_FLASH_ENABLE_PIN);
+
     ExtFlashSpiInit();
 
-    nrf_gpio_cfg_output(EXT_FLASH_ENABLE_PIN);
-    nrf_gpio_pin_clear(EXT_FLASH_ENABLE_PIN);
 
     return NRF_SUCCESS;
 }

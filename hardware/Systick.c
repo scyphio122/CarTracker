@@ -5,7 +5,7 @@
 #include "settings.h"
 #include "nrf_sdm.h"
 #include "nrf_nvic.h"
-
+#include "scheduler.h"
 
 #define SYSTICK_CLOCK_FREQ			(64000000ul)
 #define SYSTICK_MS_TO_TICKS(x)		((x)*(SYSTICK_CLOCK_FREQ/1000))
@@ -21,6 +21,10 @@ void SysTick_Handler()
 	{
 		systickTimeoutFlag = true;
 	}
+
+	scheduler_current_time_ms++;
+
+	SchedulerCheckOperations();
 }
 
 void SystickInit()

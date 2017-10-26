@@ -117,8 +117,14 @@ int main(void)
 
 //	IntFlashErasePage(PERSISTENT_CONFIG_PAGE_ADDRESS);
 	GsmGpsInit();
+
 	GpsPowerOn();
-	GpsGetData();
+
+	do
+	{
+	    GpsGetData();
+	    SystickDelayMs(5000);
+	}while (1);
 
     nrf_gpio_cfg_output(15);
     nrf_gpio_cfg_output(14);

@@ -74,6 +74,7 @@ inline uint8_t FifoPeek(app_fifo_t* fifo, uint16_t index)
 inline void FifoPut(app_fifo_t* fifo, uint8_t byte)
 {
     app_fifo_put(fifo, byte);
+    fifo->p_buf[fifo->write_pos] = 0;
 }
 
 /**

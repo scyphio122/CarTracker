@@ -32,13 +32,23 @@ void GsmGpsInit()
 
     GsmBatteryOn();
 
-    UartConfig(UART_BAUDRATE_BAUDRATE_Baud19200,
-               UART_CONFIG_PARITY_Excluded,
-               UART_CONFIG_HWFC_Disabled);
-
-    GsmPowerOn();
+    if (*(uint32_t*)(GSM_BAUDRATE_CONFIG_ADDRESS) == 0xFFFFFFFF)
+    {
+        UartConfig(UART_BAUDRATE_BAUDRATE_Baud19200,
+                   UART_CONFIG_PARITY_Excluded,
+                   UART_CONFIG_HWFC_Disabled);
+    }
+    else
+    {
+        UartConfig(UART_BAUDRATE_BAUDRATE_Baud115200,
+                   UART_CONFIG_PARITY_Excluded,
+                   UART_CONFIG_HWFC_Disabled);
+    }
     UartEnable();
     UartRxStart();
+
+    GsmPowerOn();
+
 
     // If fixed baudrate was not yet stored in the GSM ROM
     if (*(uint32_t*)(GSM_BAUDRATE_CONFIG_ADDRESS) == 0xFFFFFFFF)
@@ -107,12 +117,25 @@ void GsmBatteryOff()
     nrf_gpio_cfg_input(GSM_ENABLE_PIN, NRF_GPIO_PIN_NOPULL);
 }
 
+static void _GsmWaitForNetworkLogging()
+{
+    char* index = NULL;
+    do
+    {
+        sd_app_evt_wait();
+
+        index = strstr((const char*)uartRxFifo.p_buf, "SMS Ready");
+    }while(index == NULL);
+    FifoClear(&uartRxFifo);
+}
+
 void GsmPowerOn()
 {
     // PWRKEY sequence
     nrf_gpio_pin_set(GSM_PWRKEY_PIN);
     SystickDelayMs(2000);
     nrf_gpio_pin_clear(GSM_PWRKEY_PIN);
+    _GsmWaitForNetworkLogging();
 }
 
 void GsmPowerOff()

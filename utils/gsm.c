@@ -83,6 +83,8 @@ void GsmGpsInit()
             UartChangeBaudrate(UARTE_BAUDRATE_BAUDRATE_Baud115200);
         }
 
+        GsmSmsInit();
+
         // Store the config in the flash not to repeat this procedure every time the
         err = GsmUartSendCommand("AT&W", sizeof("AT&W"));
         if (err == GSM_OK)
@@ -124,7 +126,7 @@ static void _GsmWaitForNetworkLogging()
     {
         sd_app_evt_wait();
 
-        index = strstr((const char*)uartRxFifo.p_buf, "SMS Ready");
+        index = strstr((const char*)uartRxFifo.p_buf, "RDY");
     }while(index == NULL);
     FifoClear(&uartRxFifo);
 }
@@ -173,9 +175,25 @@ gsm_error_e GsmUartSendCommand(void* command, uint16_t commandSize)
     UartRxStop();
     UartDisable();
 
+    FifoClear(&uartRxFifo);
     if (char2 == 'O' && char3 == 'K')
         return GSM_OK;
 
     return GSM_ERROR;
+}
+
+void GsmSmsInit()
+{
+    GsmUartSendCommand(AT_GSM_SMS_SET_FORMAT_TEXT, sizeof(AT_GSM_SMS_SET_FORMAT_TEXT));
+    GsmUartSendCommand(AT_GSM_SET_SMS_CHARSET("GSM"), sizeof(AT_GSM_SET_SMS_CHARSET("GSM")));
+}
+
+void GsmSmsSend(char* telNum, const char* text)
+{
+    char textMsg[256];
+
+    sprintf(textMsg, "%s\"%s\"\r%s%c%c", AT_GSM_SEND_SMS_MESSAGE, telNum, text, '\x1A', '\0');
+
+    GsmUartSendCommand(textMsg, strlen(textMsg) + 1);
 }
 

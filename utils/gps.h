@@ -14,4 +14,8 @@ void GpsPowerOff();
 
 void GpsGetData();
 
+void GpsDisableEPO();
+
+void GpsEnableEPO();
+
 #endif /* UTILS_GPS_H_ */

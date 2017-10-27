@@ -30,4 +30,10 @@ void GsmPowerOff();
 
 gsm_error_e GsmUartSendCommand(void* command, uint16_t commandSize);
 
+void GsmSmsInit();
+
+void GsmSmsSend(char* telNum, const char* text);
+
+
+
 #endif /* UTILS_GSM_H_ */

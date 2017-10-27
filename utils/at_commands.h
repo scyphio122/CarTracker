@@ -54,9 +54,11 @@
 #define AT_GSM_SMS_SET_FORMAT_PDU           "AT+CMGF=0"
 #define AT_GSM_SMS_SET_FORMAT_TEXT          "AT+CMGF=1"
 
+#define AT_GSM_SET_SMS_CHARSET(charset)     "AT+CSCS=" #charset
+
 #define AT_GSM_READ_SMS_MESSAGE(index)      "AT+CMGR=" ## (index)
 #define AT_GSM_DELETE_SMS_MESSAGE(index)    "AT+CMGD=" ## (index)
-#define AT_GSM_SEND_SMS_MESSAGE
+#define AT_GSM_SEND_SMS_MESSAGE             "AT+CMGS="
 
 
 /** -------------------------------------------------------- GPS COMMANDS ------------------------------------------------------------------ */

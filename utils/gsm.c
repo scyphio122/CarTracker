@@ -85,6 +85,8 @@ void GsmGpsInit()
 
         GsmSmsInit();
 
+        GsmBlockIncommingCalls();
+
         // Store the config in the flash not to repeat this procedure every time the
         err = GsmUartSendCommand("AT&W", sizeof("AT&W"));
         if (err == GSM_OK)
@@ -180,6 +182,12 @@ gsm_error_e GsmUartSendCommand(void* command, uint16_t commandSize)
         return GSM_OK;
 
     return GSM_ERROR;
+}
+
+void GsmBlockIncommingCalls()
+{
+    GsmUartSendCommand(AT_GSM_SET_REFUSE_OPTS(GSM_RECEIVE_SMS, GSM_REFUSE_INCOMMING_CALL),
+                       sizeof(AT_GSM_SET_REFUSE_OPTS(GSM_RECEIVE_SMS, GSM_REFUSE_INCOMMING_CALL)));
 }
 
 void GsmSmsInit()

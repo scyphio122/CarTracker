@@ -35,7 +35,7 @@
 #define GSM_REFUSE_SMS                      "1"
 #define GSM_RECEIVE_INCOMMING_CALL          "0"
 #define GSM_REFUSE_INCOMMING_CALL           "1"
-#define AT_GSM_SET_REFUSE_OPTS(sms,call)    "AT+QREFUSECS=" ## (sms) ## "," ## (call)
+#define AT_GSM_SET_REFUSE_OPTS(sms,call)    "AT+QREFUSECS=" sms ","  call
 
 #define AT_GSM_QUERY_INITIALIZATION_STATUS  "AT+QINISTAT?"
 

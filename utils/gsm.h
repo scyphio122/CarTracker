@@ -9,6 +9,7 @@
 #define UTILS_GSM_H_
 
 #include <stdint-gcc.h>
+#include <stdbool.h>
 
 typedef enum
 {
@@ -24,11 +25,11 @@ void GsmBatteryOn();
 
 void GsmBatteryOff();
 
-void GsmPowerOn();
+void GsmPowerOn(bool waitForLogon);
 
 void GsmPowerOff();
 
-gsm_error_e GsmUartSendCommand(void* command, uint16_t commandSize);
+gsm_error_e GsmUartSendCommand(void* command, uint16_t commandSize, char* response);
 
 void GsmBlockIncommingCalls();
 

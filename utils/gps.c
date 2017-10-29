@@ -16,6 +16,7 @@
 
 gsm_sample_t gpsLastSample;
 
+
 static int _pow(int base, int exp)
     {
       if(exp < 0)
@@ -43,6 +44,8 @@ static int _atoi(char* input, uint8_t size)
         value += (*input - '0') * decimal;
         decimal /= 10;
         input++;
+        if (*input == '.')
+            break;
     }
 
     return value;
@@ -133,6 +136,7 @@ void GpsRequestMessage(gps_message_type_e msgType)
         case GPS_MSG_VTG:
         {
             GsmUartSendCommand(AT_GPS_GET_NAVI_MSG("VTG"), sizeof(AT_GPS_GET_NAVI_MSG("VTG")), NULL);
+            GpsParseMessageVTG(uartRxFifo.p_buf, uartRxFifo.buf_size_mask);
         }break;
 
         case GPS_MSG_GSA:
@@ -194,11 +198,18 @@ gps_error_e GpsParseMessageGGA(uint8_t* msgBuffer, uint16_t msgBufferSize)
        // Point just after the ',' character
        curField++;
        char* fieldEnd = strstr(curField, ",");
+
        uint8_t fieldSize = (uint8_t)(fieldEnd - curField);
 
        if (fieldSize == 0)
+       {
+           if (*curField == ',')
+           {
+               curField--;
+           }
+           fieldNumber++;
            continue;
-
+       }
        switch (fieldNumber)
        {
            case UTC_TIME:
@@ -238,7 +249,6 @@ gps_error_e GpsParseMessageGGA(uint8_t* msgBuffer, uint16_t msgBufferSize)
 
            case HDOP:
            {
-               continue;
            }break;
 
            case ALTITUDE:
@@ -248,32 +258,26 @@ gps_error_e GpsParseMessageGGA(uint8_t* msgBuffer, uint16_t msgBufferSize)
 
            case FIXED_VALUE_1:
            {
-               continue;
            }break;
 
            case GEOID_SEPARATION:
            {
-               continue;
            }break;
 
            case FIXED_VALUE_2:
            {
-               continue;
            }break;
 
            case DGPS_AGE:
            {
-               continue;
            }break;
 
            case DGPS_STATION_ID:
            {
-               continue;
            }break;
 
            case END_CHARACTER:
            {
-               continue;
            }break;
 
            default:
@@ -281,5 +285,118 @@ gps_error_e GpsParseMessageGGA(uint8_t* msgBuffer, uint16_t msgBufferSize)
        }
        fieldNumber++;
    }
-
 }
+
+gps_error_e GpsParseMessageVTG(uint8_t* msgBuffer, uint16_t msgBufferSize)
+{
+    // Get message start
+    char* msgStart = strstr(msgBuffer, "VTG");
+
+    // If start was not found then there is no GGA packet in the message
+    if (msgStart == NULL)
+        return GPS_NO_MSG_E;
+
+    // Give the pointer to the '$' character
+    int calcChecksum = _GpsCalcChecsum(msgStart - 3);
+    char* msgEnd = strstr(msgStart, "\r\n");
+    int msgChecksum = strtol((msgEnd - 2), NULL, 16);
+
+    if ((calcChecksum ^ msgChecksum) != 0)
+        return GPS_CHECKSUM_ERROR_E;
+
+    uint8_t fieldNumber = 0;
+
+    for (char* curField = msgStart; curField <= msgEnd; ++curField)
+    {
+        curField = strstr(curField, ",");
+
+        if (curField == NULL)
+        {
+            return GPS_OK_E;
+        }
+
+        // Point just after the ',' character
+        curField++;
+        char* fieldEnd = strstr(curField, ",");
+
+        uint8_t fieldSize = (uint8_t)(fieldEnd - curField);
+
+        if (fieldSize == 0)
+        {
+            if (*curField == ',')
+                curField--;
+
+            fieldNumber++;
+            continue;
+        }
+
+        switch (fieldNumber)
+        {
+            case COURSE_OVER_GROUND_TRUE:
+            {
+                gpsLastSample.azimuth = _atoi(curField, fieldSize)*100;
+                // Check existance of the dot
+                char* dotIndex = strstr(curField, ".");
+                if (dotIndex < msgEnd)
+                {
+                    gpsLastSample.azimuth += _atoi(dotIndex+1, 2);
+                }
+
+            }break;
+
+            case FIXED_VALUE_T:
+            {
+
+            }break;
+
+            case COURSE_OVER_GROUND_MAGNETIC:
+            {
+
+            }break;
+
+            case FIXED_VALUE_M:
+            {
+
+            }break;
+
+            case SPEED_KNOTS:
+            {
+
+            }break;
+
+            case FIXED_VALUE_N:
+            {
+
+            }break;
+
+            case SPEED_KM:
+            {
+                gpsLastSample.speed = _atoi(curField, fieldSize)*100;
+                // Check existance of the dot
+                char* dotIndex = strstr(curField, ".");
+                if (dotIndex < msgEnd)
+                {
+                    gpsLastSample.speed += _atoi(dotIndex+1, 2);
+                }
+            }break;
+
+            case FIXED_VALUE_K:
+            {
+                if (*curField != 'K')
+                    while(1);
+
+            }break;
+            case POSITIONING_MODE:
+            {
+
+            }break;
+
+            case VTG_END_CHARACTER:
+            {
+
+            }break;
+        }
+        fieldNumber++;
+    }
+}
+

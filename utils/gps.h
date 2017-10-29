@@ -44,8 +44,21 @@ typedef enum
     DGPS_AGE,
     DGPS_STATION_ID,
     END_CHARACTER
-
 }gps_gga_message_fields_e;
+
+typedef enum
+{
+    COURSE_OVER_GROUND_TRUE,
+    FIXED_VALUE_T,
+    COURSE_OVER_GROUND_MAGNETIC,
+    FIXED_VALUE_M,
+    SPEED_KNOTS,
+    FIXED_VALUE_N,
+    SPEED_KM,
+    FIXED_VALUE_K,
+    POSITIONING_MODE,
+    VTG_END_CHARACTER
+}gps_vtg_message_fields_e;
 
 typedef struct
 {
@@ -85,6 +98,9 @@ typedef struct
 
 }gsm_sample_t;
 
+extern gsm_sample_t gpsLastSample;
+
+
 void GpsPowerOn();
 
 void GpsPowerOff();
@@ -99,5 +115,5 @@ void GpsRequestMessage(gps_message_type_e msgType);
 
 gps_error_e GpsParseMessageGGA(uint8_t* msgBuffer, uint16_t msgBufferSize);
 
-
+gps_error_e GpsParseMessageVTG(uint8_t* msgBuffer, uint16_t msgBufferSize);
 #endif /* UTILS_GPS_H_ */

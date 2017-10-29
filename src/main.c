@@ -52,7 +52,6 @@
  */
 
 nrf_nvic_state_t nrf_nvic_state = {0};
-
 void POWER_CLOCK_IRQHandler()
 {
 	NRF_CLOCK->EVENTS_HFCLKSTARTED = 0;
@@ -123,7 +122,9 @@ int main(void)
 	do
 	{
 //	    GpsGetData();
+	    memset(&gpsLastSample, 0, sizeof(gpsLastSample));
 	    GpsRequestMessage(GPS_MSG_GGA);
+	    GpsRequestMessage(GPS_MSG_VTG);
 	    SystickDelayMs(5000);
 	}while (1);
 

@@ -231,6 +231,12 @@ void SpiDisable(NRF_SPI_Type* spi)
 	spi->ENABLE = 0;
 }
 
+void SpiSwitchPolarityPhase(NRF_SPI_Type* spi, uint8_t cpol, uint8_t cpha)
+{
+    spi->CONFIG &= ~(SPI_CONFIG_CPHA_Msk | SPI_CONFIG_CPOL_Msk);
+    spi->CONFIG |= (cpol << SPI_CONFIG_CPOL_Pos) | (cpha << SPI_CONFIG_CPHA_Pos);
+}
+
 E_SPI_Errors SpiWrite(NRF_SPI_Type* spi, uint8_t* in_buf, uint16_t data_size)
 {
 	E_SPI_Errors error = E_SPI_SUCCESS;
@@ -343,11 +349,13 @@ E_SPI_Errors SpiRead(NRF_SPI_Type* spi, uint8_t* out_buf, uint16_t data_size)
 			s_spi1_read_buffer = out_buf;
 
 			NRF_SPI1->INTENSET = SPI_INTENSET_READY_Msk;
+			char dummy = NRF_SPI1->RXD;
 			NRF_SPI1->TXD = SPI_DUMMY_BYTE;
 			while (s_spi1_is_reading)
 			{
 #if SOFTDEVICE_ENABLED
-				sd_app_evt_wait();
+                __WFE();
+//				sd_app_evt_wait();
 #else
 				__WFE();
 #endif

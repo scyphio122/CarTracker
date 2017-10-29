@@ -51,6 +51,8 @@ void SpiEnable(NRF_SPI_Type* spi);
 
 void SpiDisable(NRF_SPI_Type* spi);
 
+void SpiSwitchPolarityPhase(NRF_SPI_Type* spi, uint8_t cpol, uint8_t cpha);
+
 E_SPI_Errors SpiWrite(NRF_SPI_Type* spi, uint8_t* in_buf, uint16_t data_size);
 
 E_SPI_Errors SpiRead(NRF_SPI_Type* spi, uint8_t* out_buf, uint16_t data_size);

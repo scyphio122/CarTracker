@@ -31,8 +31,6 @@ static void ExtFlashSpiInit()
               EXT_FLASH_CS_PIN
             );
 
-    SpiEnable(EXT_FLASH_SPI_PERIPH);
-
 }
 
 uint32_t ExtFlashInit()
@@ -51,12 +49,13 @@ uint32_t ExtFlashInit()
  * \param read_or_erase - the param which tells what kind of operation will be done next. It is needed, because the time from power-up to read command or program/erase command is different
  *
  */
-__attribute__((optimize("O2")))
+__attribute__((optimize("O0")))
 uint32_t ExtFlashTurnOn(ext_flash_operation_type_e read_or_erase)
 {
     if(ext_flash_on == 0)
     {
-        nrf_gpio_pin_clear(EXT_FLASH_ENABLE_PIN);
+        NRF_GPIO->OUTCLR = 1 << EXT_FLASH_ENABLE_PIN;
+//        nrf_gpio_pin_clear(EXT_FLASH_ENABLE_PIN);
         ext_flash_on = 1;
         if(read_or_erase == EXT_FLASH_READ_OP)
             RTCDelay(NRF_RTC1, RTC1_US_TO_TICKS(EXT_FLASH_TURN_ON_DELAY_READ_US));
@@ -71,12 +70,12 @@ uint32_t ExtFlashTurnOn(ext_flash_operation_type_e read_or_erase)
 /**
  * \brief This function turns off the external flash module.
  */
-__attribute__((optimize("O2")))
+__attribute__((optimize("O0")))
 uint32_t ExtFlashTurnOff()
 {
     if(ext_flash_on == 1)
     {
-        nrf_gpio_pin_set(EXT_FLASH_ENABLE_PIN);
+        NRF_GPIO->OUTSET = 1 << EXT_FLASH_ENABLE_PIN;
         ext_flash_on = 0;
 
         return NRF_SUCCESS;

@@ -48,7 +48,7 @@
 
 
 #define SMS_CENTER_NUMBER                   "\"+48790998250\""
-#define AT_GSM_SMS_SET_SMS_CENTER_NUMBER    "AT+CSCA=" ## SMS_CENTER_NUMBER ## ",145"
+#define AT_GSM_SMS_SET_SMS_CENTER_NUMBER    "AT+CSCA=" SMS_CENTER_NUMBER ",145"
 
 #define AT_GSM_SMS_QUERY_FORMAT             "AT+CMGF?"
 #define AT_GSM_SMS_SET_FORMAT_PDU           "AT+CMGF=0"
@@ -56,8 +56,8 @@
 
 #define AT_GSM_SET_SMS_CHARSET(charset)     "AT+CSCS=" #charset
 
-#define AT_GSM_READ_SMS_MESSAGE(index)      "AT+CMGR=" ## (index)
-#define AT_GSM_DELETE_SMS_MESSAGE(index)    "AT+CMGD=" ## (index)
+#define AT_GSM_READ_SMS_MESSAGE(index)      "AT+CMGR=" #index
+#define AT_GSM_DELETE_SMS_MESSAGE(index)    "AT+CMGD=" #index
 #define AT_GSM_SEND_SMS_MESSAGE             "AT+CMGS="
 
 
@@ -70,11 +70,11 @@
 
 /** This command makes the GPS to send navigational information */
 #define AT_GPS_GET_NAVI_DATA                "AT+QGNSSRD?"
-#define AT_GPS_GET_NAVI_MSG(msg)            "AT+QGNSSRD=" ## (msg)
+#define AT_GPS_GET_NAVI_MSG(msg)            "AT+QGNSSRD=\"NMEA/" msg "\""
 
 /** Send manufactorer command to the GPS **/
-#define AT_GPS_SEND_COMMAND_HEX(cmd)        ("AT+QGNSSCMD=1," ## (cmd))
-#define AT_GPS_SEND_COMMAND_NMEA(cmd)       ("AT+QGNSSCMD=0," ## (cmd))
+#define AT_GPS_SEND_COMMAND_HEX(cmd)        ("AT+QGNSSCMD=1," cmd)
+#define AT_GPS_SEND_COMMAND_NMEA(cmd)       ("AT+QGNSSCMD=0," cmd)
 
 /** Enable EPO functionality **/
 #define AT_GPS_EPO_ENABLE                   "AT+QGNSSEPO=1"
@@ -84,6 +84,6 @@
 #define AT_GPS_GET_TIME_SYNC_STATUS         "AT+QGNSSTS?"
 
 /** Set reference localization (last known localization) to decrease TTFF **/
-#define AT_GPS_SET_REF_LOCATION(lat, lng)   "AT+QGREFLOC=" ## (lat) ## "," ## (lng)
+#define AT_GPS_SET_REF_LOCATION(lat, lng)   "AT+QGREFLOC=" lat "," lng
 
 #endif /* UTILS_AT_COMMANDS_H_ */

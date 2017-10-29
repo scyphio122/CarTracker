@@ -53,6 +53,7 @@ C_SOURCE_FILES += utils/external_flash_driver.c
 C_SOURCE_FILES += utils/file_system.c
 C_SOURCE_FILES += utils/gps.c
 C_SOURCE_FILES += utils/gsm.c
+#C_SOURCE_FILES += utils/nfc.c
 C_SOURCE_FILES += hardware/Systick.c
 C_SOURCE_FILES += hardware/UART.c
 C_SOURCE_FILES += hardware/SPI.c 

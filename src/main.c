@@ -35,7 +35,7 @@
 #include "pinout.h"
 #include "gsm.h"
 #include "gps.h"
-
+//#include "nfc.h"
 /*
  *
  * Print a greeting message on standard output and exit.
@@ -117,23 +117,28 @@ int main(void)
 
 //	IntFlashErasePage(PERSISTENT_CONFIG_PAGE_ADDRESS);
 	GsmGpsInit();
-
+//
 	GpsPowerOn();
 
 	do
 	{
-	    GpsGetData();
+//	    GpsGetData();
+	    GpsRequestMessage(GPS_MSG_GGA);
 	    SystickDelayMs(5000);
 	}while (1);
 
-    nrf_gpio_cfg_output(15);
-    nrf_gpio_cfg_output(14);
-    nrf_gpio_cfg_output(NFC_CS_PIN);
-    nrf_gpio_pin_set(NFC_CS_PIN);
-
+//	NfcInit();
+//
+//	NfcPowerOn();
+//	SystickDelayMs(1);
+//	NfcTxRxHalfPower();
 //	ExtFlashInit();
-
+//
 //    ExtFlashTurnOn(EXT_FLASH_PROGRAM_OP);
+//    uint8_t data[64] = "Litwo, Ojczyzno moja, Ty jestes jak zdrowie, Ten tylko sie dowie";
+//    uint8_t b[64];
+//    ExtFlashProgramPageThroughBufferWithoutPreerase(0x1000, data, 64);
+//    ExtFlashReadPage(0x1000, b, 64);
 
     // Check if the Main Key exists
 //    if (!CryptoCheckMainKey())
@@ -142,11 +147,7 @@ int main(void)
 //    }
 
 
-    /*uint8_t data[64] = "Litwo, Ojczyzno moja, Ty jestes jak zdrowie, Ten tylko sie dowie";
-    uint8_t b[64];
-    ExtFlashProgramPageThroughBufferWithoutPreerase(0x1000, data, 64);
-    ExtFlashReadPage(0x1000, b, 64);
-*/
+
 //    uint8_t dataEncrypted[64];
 //    uint8_t dataDecrypted[64];
 //    uint8_t iv[16];

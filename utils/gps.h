@@ -62,14 +62,6 @@ typedef enum
 
 typedef struct
 {
-    uint8_t hour;
-    uint8_t minute;
-    uint8_t second;
-    uint16_t millisecond;
-}gps_time_t;
-
-typedef struct
-{
     uint8_t  degrees;
     uint8_t  minutes;
     uint16_t seconds;

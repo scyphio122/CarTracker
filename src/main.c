@@ -114,6 +114,16 @@ int main(void)
 	nrf_gpio_cfg_output(DEBUG_2_PIN_PIN);
 	nrf_gpio_pin_clear(DEBUG_2_PIN_PIN);
 
+	rtc_time_t time;
+	rtc_date_t date;
+	time.hour = 21;
+	time.minute = 18;
+	time.second = 34;
+
+	date.day = 30;
+	date.month = 10;
+	date.year = 2017;
+	uint32_t timestamp = RtcConvertDateTimeToTimestamp(&time, &date);
 //	IntFlashErasePage(PERSISTENT_CONFIG_PAGE_ADDRESS);
 	GsmGpsInit();
 //

@@ -13,6 +13,7 @@
 #include "nrf_gpio.h"
 #include <string.h>
 #include <stdlib.h>
+#include "RTC.h"
 
 gsm_sample_t gpsLastSample;
 
@@ -67,7 +68,7 @@ static int _GpsCalcChecsum(uint8_t* messageStart)
     return checksum;
 }
 
-static void GpsParseTime(char* hour, char* minute, char* second, char* millisecond, gps_time_t* outTime)
+static void GpsParseTime(char* hour, char* minute, char* second, char* millisecond, rtc_time_t* outTime)
 {
     outTime->hour = _atoi(hour, 2);
     outTime->minute = _atoi(minute, 2);
@@ -183,7 +184,7 @@ gps_error_e GpsParseMessageGGA(uint8_t* msgBuffer, uint16_t msgBufferSize)
    if ((calcChecksum ^ msgChecksum) != 0)
        return GPS_CHECKSUM_ERROR_E;
 
-   gps_time_t time;
+   rtc_time_t time;
    uint8_t fieldNumber = 0;
 
    for (char* curField = msgStart; curField <= msgEnd; ++curField)

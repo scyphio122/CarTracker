@@ -13,6 +13,7 @@
 #include "settings.h"
 #include "nrf_sdm.h"
 #include "nrf_soc.h"
+#include <stdint-gcc.h>
 
 #define RTC0_PRESCALER				0
 #define RTC0_FREQUENCY   			(32768/(RTC0_PRESCALER + 1))
@@ -49,6 +50,23 @@ typedef struct
 	bool timeoutTriggeredFlag;
 }rtc_timeout_t;
 
+typedef struct
+{
+    uint8_t hour;
+    uint8_t minute;
+    uint8_t second;
+    uint16_t millisecond;
+}rtc_time_t;
+
+typedef struct
+{
+    uint16_t year;
+    uint8_t  month;
+    uint8_t  day;
+}rtc_date_t;
+
+
+
 extern volatile rtc_timeout_t rtcTimeoutArray[RTC_TIMEOUT_ARRAY_SIZE];
 
 RTC_Error_e RTCInit(NRF_RTC_Type* RTC);
@@ -60,5 +78,10 @@ RTC_Error_e RTCStop(NRF_RTC_Type* RTC);
 RTC_Error_e RTCDelay(NRF_RTC_Type* RTC, uint32_t time_ticks);
 RTC_Error_e RTCTimeout(NRF_RTC_Type* RTC, uint32_t time_ticks, uint8_t* outTimeoutId);
 RTC_Error_e RTCClearTimeout(NRF_RTC_Type* RTC, uint8_t timeoutId);
+
+RTC_Error_e RtcSetTimestamp(uint32_t time);
+uint32_t RtcGetTimestamp();
+uint32_t RtcConvertDateTimeToTimestamp(rtc_time_t* inTime, rtc_date_t* inDate);
+
 
 #endif /* HARDWARE_RTC_H_ */

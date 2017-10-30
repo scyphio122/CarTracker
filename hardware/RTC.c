@@ -10,6 +10,8 @@
 #include "core_cm4.h"
 #include "nrf_nvic.h"
 #include "stdlib.h"
+#include <stdint-gcc.h>
+#include <time.h>
 
 #define DELAY_REGISTER_MAIN			0
 #define	TIMEOUT_REGISTER_MAIN 		1
@@ -20,6 +22,8 @@ volatile rtc_timeout_t rtcTimeoutArray[RTC_TIMEOUT_ARRAY_SIZE];		/**< Array in w
 volatile bool rtc1_delay_completed_flag;							/**< Delay flag - set to true if the delay has been completed */
 volatile bool rtc2_delay_completed_flag;							/**< Delay flag - set to true if the delay has been completed */
 volatile bool rtc2_timeout_triggered_flag;							/**< Timeout flag - set to true if the timeout has been triggered */
+
+uint32_t rtc_timestamp_partial;
 
 #if !SOFTDEVICE_ENABLED
 void RTC0_IRQHandler()
@@ -35,26 +39,32 @@ void RTC1_IRQHandler()
 		NRF_RTC1->EVENTS_COMPARE[DELAY_REGISTER_MAIN] = 0;
 		rtc1_delay_completed_flag = true;
 	}
-	else
+
 	if (NRF_RTC1->EVENTS_COMPARE[TIMEOUT_REGISTER_MAIN])		/*< RTC TIMEOUT */
 	{
 		NRF_RTC1->EVENTS_COMPARE[TIMEOUT_REGISTER_MAIN] = 0;
 		RTCDisableComparingReg(NRF_RTC1, TIMEOUT_REGISTER_MAIN);
 		rtcTimeoutArray[TIMEOUT_REGISTER_MAIN - 1].timeoutTriggeredFlag = true;
 	}
-	else
+
 	if (NRF_RTC1->EVENTS_COMPARE[TIMEOUT_REGISTER_SECOND])		/*< RTC TIMEOUT SECOND */
 	{
 		NRF_RTC1->EVENTS_COMPARE[TIMEOUT_REGISTER_SECOND] = 0;
 		RTCDisableComparingReg(NRF_RTC1, TIMEOUT_REGISTER_SECOND);
 		rtcTimeoutArray[TIMEOUT_REGISTER_SECOND - 1].timeoutTriggeredFlag = true;
 	}
-	else
+
 	if (NRF_RTC1->EVENTS_COMPARE[TIMEOUT_REGISTER_THIRD])		/*< RTC TIMEOUT THIRD */
 	{
 		NRF_RTC1->EVENTS_COMPARE[TIMEOUT_REGISTER_THIRD] = 0;
 		RTCDisableComparingReg(NRF_RTC1, TIMEOUT_REGISTER_THIRD);
 		rtcTimeoutArray[TIMEOUT_REGISTER_THIRD - 1].timeoutTriggeredFlag = true;
+	}
+
+	if (NRF_RTC1->EVENTS_OVRFLW)
+	{
+	    NRF_RTC1->EVENTS_OVRFLW = 0;
+	    rtc_timestamp_partial += 0x00FFFFFF/RTC0_FREQUENCY;
 	}
 }
 
@@ -163,6 +173,8 @@ RTC_Error_e RTCInit(NRF_RTC_Type* RTC)
 	{
 		sd_nvic_SetPriority(RTC1_IRQn, RTC1_PRIORITY);
 		sd_nvic_EnableIRQ(RTC1_IRQn);
+		NRF_RTC1->EVTENSET = RTC_EVTENSET_OVRFLW_Enabled << RTC_EVTENSET_OVRFLW_Pos;
+		NRF_RTC1->INTENSET = RTC_INTENSET_OVRFLW_Enabled << RTC_INTENSET_OVRFLW_Pos;
 	}
 
 	if (RTC == NRF_RTC2)
@@ -309,4 +321,31 @@ RTC_Error_e RTCStop(NRF_RTC_Type* RTC)
 	RTC->TASKS_STOP = 1;
 
 	return E_RTC_OK;
+}
+
+RTC_Error_e RtcSetTimestamp(uint32_t time)
+{
+    rtc_timestamp_partial = time - NRF_RTC1->COUNTER/RTC1_FREQUENCY;
+    return E_RTC_OK;
+}
+
+uint32_t RtcGetTimestamp()
+{
+    return (rtc_timestamp_partial + NRF_RTC1->COUNTER/RTC1_FREQUENCY);
+}
+
+uint32_t RtcConvertDateTimeToTimestamp(rtc_time_t* inTime, rtc_date_t* inDate)
+{
+    struct tm _time;
+
+    _time.tm_sec = inTime->second;
+    _time.tm_min = inTime->minute;
+    _time.tm_hour = inTime->hour;
+    _time.tm_year = inDate->year - 1900;
+    _time.tm_mon = inDate->month - 1;
+    _time.tm_mday = inDate->day;
+    _time.tm_isdst = -1;
+
+    return mktime(&_time);
+
 }

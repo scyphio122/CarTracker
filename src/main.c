@@ -191,26 +191,14 @@ int main(void)
 //    uint32_t encryptTime = (encryptEnd - encryptStart);
 //    uint32_t decryptTime = decryptEnd - decryptStart;
 
-//	uint32_t retcode = 0;
-//	retcode = IntFlashStoreWord(0xDEADBEEF, (uint32_t*)0x30000);
-//	retcode = IntFlashStoreWord(0x12345678, (uint32_t*)0x30004);
-//	retcode = IntFlashErasePage((uint32_t*)0x30000);
-//	UartConfig(UART_BAUDRATE_BAUDRATE_Baud9600, UART_CONFIG_PARITY_Included, UART_CONFIG_HWFC_Disabled);
-//	UartEnable();
-//	UartSendDataSync("Hello World, it's nRF52!", sizeof("Hello World, it's nRF52!"));
-//
-//	SpiConfig(NRF_SPI0, SPI_FREQUENCY_FREQUENCY_M8, SPI_CONFIG_ORDER_MsbFirst, SPI_CONFIG_CPHA_Leading, SPI_CONFIG_CPOL_ActiveHigh);
-//	SpiEnable(NRF_SPI0);
-//	SpiWrite(NRF_SPI0, "Hello World, it's nRF52!", sizeof("Hello World, it's nRF52!"));
-//	UartReadDataEndCharSync(buf, '\n');M
-
 	while(1)
 	{
 	    sd_app_evt_wait();
-//	    BleUartServicePendingTasks();
-//		RTCDelay(NRF_RTC1, RTC1_MS_TO_TICKS(1000));
-//		nrf_gpio_pin_toggle(17);
+	    ScheduleExecutePendingOperations();
+	    BleUartServicePendingTasks();
 	}
 
   return 0;
 }
+
+

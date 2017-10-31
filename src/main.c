@@ -35,6 +35,8 @@
 #include "pinout.h"
 #include "gsm.h"
 #include "gps.h"
+#include "GPIOTE.h"
+#include "scheduler.h"
 //#include "nfc.h"
 /*
  *
@@ -105,6 +107,7 @@ int main(void)
 	AdvertisingInit();
 	BleCentralInit();
 
+
 //	AdvertisingStart();
 //    BleCentralScanStart();
 #endif
@@ -126,6 +129,8 @@ int main(void)
 	uint32_t timestamp = RtcConvertDateTimeToTimestamp(&time, &date);
 //	IntFlashErasePage(PERSISTENT_CONFIG_PAGE_ADDRESS);
 	GsmGpsInit();
+    GpioteInit();
+
 //
 	GpsPowerOn();
 

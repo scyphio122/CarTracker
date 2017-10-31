@@ -56,6 +56,32 @@ uint32_t BleUartServicePendingTasks()
                 memcpy(test, "Litwo, Ojczyzno moja! Ile Cie trzeba cenic", size);
                 BleUartDataIndicate(m_conn_handle_peripheral, E_TEST, test, size, true);
             }break;
+
+            case E_BLE_UART_GET_DEVICE_PHONE_NUMBER:
+            {
+
+            }break;
+
+            case E_BLE_UART_OWNER_PHONE_NUMBER:
+            {
+
+            }break;
+
+            case E_BLE_UART_DEVICE_REGISTERED:
+            {
+
+            }break;
+
+            case E_BLE_UART_SET_TIMESTAMP:
+            {
+
+            }break;
+
+            case E_BLE_UART_GET_TIMESTAMP:
+            {
+
+            }break;
+
         }
     }
 

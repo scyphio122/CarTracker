@@ -18,6 +18,11 @@
 #include "internal_flash.h"
 #include "internal_memory_organization.h"
 #include <string.h>
+#include "parsing_utils.h"
+#include "gps.h"
+
+uint64_t    gsmDeviceNumber;
+uint64_t    gsmOwnerDeviceNumber = 48691494830;
 
 static void _GsmWaitForNetworkLogging()
 {
@@ -219,6 +224,35 @@ void GsmSmsInit()
     GsmUartSendCommand(AT_GSM_SET_SMS_CHARSET("GSM"), sizeof(AT_GSM_SET_SMS_CHARSET("GSM")), NULL);
 }
 
+static void _GsmExecuteTask(char* smsText)
+{
+    if (strcmp(smsText, GSM_SMS_COMMAND_GET_LOCATION) == 0)
+    {
+        char telNum[12];
+//        sprintf(telNum, "%llu", gsmOwnerDeviceNumber);
+        _itoa(gsmOwnerDeviceNumber, telNum, sizeof(telNum));
+        char localization[64];
+        memset(localization, 0, sizeof(localization));
+        if (gpsLastSample.fixStatus == GPS_FIX_NO_FIX)
+        {
+            memcpy(localization, "No fix", sizeof("No fix"));
+        }
+        else
+        {
+            sprintf(localization, "Latitude: %d*%d.%d'%c;Longitutde: %d*%d.%d'%c",
+                    gpsLastSample.latitude.degrees,
+                    gpsLastSample.latitude.minutes,
+                    gpsLastSample.latitude.seconds,
+                    gpsLastSample.latitude.hemisphereDescriptor,
+                    gpsLastSample.longtitude.degrees,
+                    gpsLastSample.longtitude.minutes,
+                    gpsLastSample.longtitude.seconds,
+                    gpsLastSample.longtitude.hemisphereDescriptor);
+        }
+        GsmSmsSend(telNum, localization);
+    }
+}
+
 void GsmSmsSend(char* telNum, const char* text)
 {
     char textMsg[256];
@@ -226,5 +260,70 @@ void GsmSmsSend(char* telNum, const char* text)
     sprintf(textMsg, "%s\"%s\"\r%s%c%c", AT_GSM_SEND_SMS_MESSAGE, telNum, text, '\x1A', '\0');
 
     GsmUartSendCommand(textMsg, strlen(textMsg) + 1, NULL);
+}
+
+void GsmSmsReadAll()
+{
+    char command[16];
+    char smsIndex[3];
+    char smsText[256];
+    gsm_error_e err;
+
+    memset(smsIndex, 0, sizeof(smsIndex));
+    memcpy(command, AT_GSM_READ_ALL_SMS_MESSAGES, sizeof(AT_GSM_READ_ALL_SMS_MESSAGES));
+
+    for (uint8_t i=0; i<10; ++i)
+    {
+        memset(smsText, 0, sizeof(smsText));
+        sscanf(smsIndex, "%d", i);
+        strcat(command, smsIndex);
+        err = GsmUartSendCommand(command, strlen(command), smsText);
+
+        if (err == GSM_OK)
+        {
+            // Find the telephone number
+            char* temp = strstr(smsText, ",\"+");
+            temp += 3;
+            char* telNumEnd = strstr(temp, "\",");
+
+            int64_t telNum = _atoi(temp, (telNumEnd - temp));
+
+            // If sms is not from the device owner - ignore it
+            if (telNum != gsmOwnerDeviceNumber)
+            {
+                continue;
+            }
+
+            // Go to the text message
+            temp = strstr(temp, "\r");
+            // Temp points to the first caracter of the actual sms text
+            temp += 2;
+            // Find the '\r\n' characters at the and of the sms text and put there the string terminating '\0' character
+            char* smsTextEnd = strstr(temp, "\r\n");
+            *smsTextEnd = '\0';
+            _GsmExecuteTask(temp);
+            GsmSmsDeleteAll();
+            break;
+        }
+    }
+
+
+}
+
+void GsmSmsDelete(int smsIndex)
+{
+    char command[16];
+    char index[3];
+    memcpy(command, AT_GSM_DELETE_SMS_MESSAGE, sizeof(AT_GSM_DELETE_SMS_MESSAGE));
+
+    sscanf(index, "%d", smsIndex);
+    strcat(command, index);
+
+    GsmUartSendCommand(command, strlen(command), NULL);
+}
+
+void GsmSmsDeleteAll()
+{
+    GsmUartSendCommand(AT_GSM_DELETE_ALL_SMS_MESSAGES, sizeof(AT_GSM_DELETE_ALL_SMS_MESSAGES), NULL);
 }
 

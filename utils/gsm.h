@@ -17,6 +17,12 @@ typedef enum
     GSM_ERROR
 }gsm_error_e;
 
+
+#define GSM_SMS_COMMAND_GET_LOCATION        "GET LOCATION"
+
+extern uint64_t    gsmDeviceNumber;
+extern uint64_t    gsmOwnerDeviceNumber;
+
 #define GSM_FIXED_BAUDRATE_SET      (uint32_t)(0xFFFFFFFE)
 
 void GsmGpsInit();
@@ -37,6 +43,11 @@ void GsmSmsInit();
 
 void GsmSmsSend(char* telNum, const char* text);
 
+void GsmSmsReadAll();
+
+void GsmSmsDelete(int smsIndex);
+
+void GsmSmsDeleteAll();
 
 
 #endif /* UTILS_GSM_H_ */

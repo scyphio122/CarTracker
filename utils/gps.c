@@ -14,43 +14,9 @@
 #include <string.h>
 #include <stdlib.h>
 #include "RTC.h"
+#include "parsing_utils.h"
 
 gsm_sample_t gpsLastSample;
-
-
-static int _pow(int base, int exp)
-    {
-      if(exp < 0)
-        return -1;
-
-        int result = 1;
-        while (exp)
-        {
-            if (exp & 1)
-                result *= base;
-            exp >>= 1;
-            base *= base;
-        }
-
-        return result;
-    }
-
-static int _atoi(char* input, uint8_t size)
-{
-    int value = 0;
-    uint32_t decimal = _pow(10, size-1);
-
-    for (int i=0; i < size; ++i)
-    {
-        value += (*input - '0') * decimal;
-        decimal /= 10;
-        input++;
-        if (*input == '.')
-            break;
-    }
-
-    return value;
-}
 
 static int _GpsCalcChecsum(uint8_t* messageStart)
 {

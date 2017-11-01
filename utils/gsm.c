@@ -152,6 +152,8 @@ void GsmGpsInit()
     GsmSmsInit();
 
     GsmBlockIncommingCalls();
+
+    GsmSynchronizeTime();
 }
 
 void GsmBatteryOn()
@@ -333,11 +335,12 @@ void GsmSynchronizeTime()
     memset(timeBuf, 0, sizeof(timeBuf));
     GsmUartSendCommand(AT_GSM_QUERY_LAST_NETWORK_TIME, sizeof(AT_GSM_QUERY_LAST_NETWORK_TIME), timeBuf);
 
-    buf = strstr(timeBuf, ":");
-
+    buf = strstr(timeBuf, "\"");
+    buf++;
     sscanf(buf, "%d/%d/%d,%d:%d:%d%c%d%s", &date.year, &date.month, &date.day, &time.hour, &time.minute, &time.second, dummy, &timeZone, dummy + 1);
-    time.hour += timeZone;
+//    time.hour += timeZone;
 
+    date.year += 2000;
     RtcSetTimestamp(RtcConvertDateTimeToTimestamp(&time, &date));
 }
 

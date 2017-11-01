@@ -8,6 +8,8 @@
 #ifndef INC_TASKS_H_
 #define INC_TASKS_H_
 
+void TaskScanForKeyTag();
+
 void TaskGpsGetSample();
 
 void TaskAlarmSendLocation();

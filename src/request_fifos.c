@@ -16,6 +16,7 @@
 #include "internal_flash.h"
 #include "tasks.h"
 #include "crypto.h"
+#include "gsm.h"
 
 static fifo_t     ble_uart_pending_requests_fifo;
 static uint8_t    ble_uart_pending_requests_fifo_buffer[16];
@@ -119,6 +120,15 @@ uint32_t BleUartServicePendingTasks()
                 BleUartDataIndicate(m_conn_handle_central, E_BLE_UART_SEND_IV_ON_KEY_TAG_CONNECT | 0x80, encryptedIv, CRYPTO_KEY_SIZE, true);
             }break;
 
+            case E_BLE_UART_GET_AVAILABLE_TRACKS:
+            {
+
+            }break;
+
+            case E_BLE_UART_GET_HISTORY_TRACK:
+            {
+
+            }break;
         }
     }
 
@@ -163,6 +173,20 @@ uint32_t SystemServicePendingTasks()
                 TaskAlarmSendLocation();
             }break;
 
+            case E_SYSTEM_START_NEW_TRACK:
+            {
+                TaskStartNewTrack();
+            }break;
+
+            case E_SYSTEM_STOP_NEW_TRACK:
+            {
+                TaskEndCurrentTrack();
+            }break;
+
+            case E_SYSTEM_SYNCHRONIZE_TIME_WITH_GSM:
+            {
+                GsmSynchronizeTime();
+            }break;
         }
     }
 

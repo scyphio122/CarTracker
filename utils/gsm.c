@@ -23,10 +23,26 @@
 #include "tasks.h"
 #include "scheduler.h"
 #include "request_fifos.h"
+#include <time.h>
+#include "RTC.h"
 
 uint64_t    gsmDeviceNumber;
 uint64_t    gsmOwnerDeviceNumber = 48691494830;
 uint32_t    deviceId = 0;
+
+static void _GsmExecuteSmsTask(char* smsText)
+{
+    if (strcmp(smsText, GSM_SMS_COMMAND_GET_LOCATION) == 0)
+    {
+//        TaskAlarmSendLocation();
+        SystemAddPendingTask(E_SYSTEM_SEND_SMS_WITH_LOCATION);
+    }
+    else
+    if (strcmp(smsText, GSM_SMS_COMMAND_ABORT_ALARM) == 0)
+    {
+        TaskAbortAlarm();
+    }
+}
 
 static void _GsmWaitForNetworkLogging()
 {
@@ -175,6 +191,8 @@ gsm_error_e GsmUartSendCommand(void* command, uint16_t commandSize, char* respon
     static uint8_t cmd[32];
     char* success = NULL;
     char* error = NULL;
+    uint8_t timeoutId = 0;
+
     memcpy(cmd, command, commandSize - 1);
     cmd[commandSize - 1] = '\n';
     FifoClear(&uartRxFifo);
@@ -184,12 +202,15 @@ gsm_error_e GsmUartSendCommand(void* command, uint16_t commandSize, char* respon
 
     UartSendDataSync(cmd, commandSize);
 
+    RTCTimeout(NRF_RTC1, RTC1_MS_TO_TICKS(1000), &timeoutId);
     do
     {
         sd_app_evt_wait();
         success = strstr(uartRxFifo.p_buf, "OK");
         error = strstr(uartRxFifo.p_buf, "ERROR");
-    }while(success == NULL && error == NULL);
+    }while(success == NULL && error == NULL && rtcTimeoutArray[timeoutId].timeoutTriggeredFlag == false);
+
+    RTCClearTimeout(NRF_RTC1, timeoutId);
 
     UartRxStop();
     UartDisable();
@@ -226,19 +247,7 @@ void GsmSmsInit()
     GsmUartSendCommand(AT_GSM_SET_SMS_CHARSET("GSM"), sizeof(AT_GSM_SET_SMS_CHARSET("GSM")), NULL);
 }
 
-static void _GsmExecuteSmsTask(char* smsText)
-{
-    if (strcmp(smsText, GSM_SMS_COMMAND_GET_LOCATION) == 0)
-    {
-//        TaskAlarmSendLocation();
-        SystemAddPendingTask(E_SYSTEM_SEND_SMS_WITH_LOCATION);
-    }
-    else
-    if (strcmp(smsText, GSM_SMS_COMMAND_ABORT_ALARM) == 0)
-    {
-        TaskAbortAlarm();
-    }
-}
+
 
 void GsmSmsSend(char* telNum, const char* text)
 {
@@ -312,7 +321,37 @@ void GsmSmsDeleteAll()
     GsmUartSendCommand(AT_GSM_DELETE_ALL_SMS_MESSAGES, sizeof(AT_GSM_DELETE_ALL_SMS_MESSAGES), NULL);
 }
 
+void GsmSynchronizeTime()
+{
+    char timeBuf[64];
+    char dummy[5];
+    char* buf;
+    int8_t timeZone = 0;
+    rtc_time_t time;
+    rtc_date_t date;
+
+    memset(timeBuf, 0, sizeof(timeBuf));
+    GsmUartSendCommand(AT_GSM_QUERY_LAST_NETWORK_TIME, sizeof(AT_GSM_QUERY_LAST_NETWORK_TIME), timeBuf);
+
+    buf = strstr(timeBuf, ":");
+
+    sscanf(buf, "%d/%d/%d,%d:%d:%d%c%d%s", &date.year, &date.month, &date.day, &time.hour, &time.minute, &time.second, dummy, &timeZone, dummy + 1);
+    time.hour += timeZone;
+
+    RtcSetTimestamp(RtcConvertDateTimeToTimestamp(&time, &date));
+}
+
 gsm_error_e GsmHttpSendMessage(uint8_t* data, uint32_t dataSize)
+{
+    return GSM_OK;
+}
+
+gsm_error_e GsmHttpSendStartTrack()
+{
+    return GSM_OK;
+}
+
+gsm_error_e GsmHttpEndTrack()
 {
     return GSM_OK;
 }

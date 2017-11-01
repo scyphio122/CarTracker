@@ -44,7 +44,7 @@
 #define AT_GSM_QUERY_NETWORK_TIME_INIT      "AT+QNITZ?"
 #define AT_GSM_WRITE_NETWORK_TIME_INIT(en)  "AT+QNITZ=" ## (en)
 
-#define AT_GSM_QUERY_LAST_NETWORK_TIME      "AT+QLTS?"
+#define AT_GSM_QUERY_LAST_NETWORK_TIME      "AT+QLTS"
 
 
 #define SMS_CENTER_NUMBER                   "\"+48790998250\""

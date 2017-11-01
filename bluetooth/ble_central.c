@@ -240,7 +240,8 @@ void on_ble_central_evt(ble_evt_t const * p_ble_evt)
         case BLE_GAP_EVT_DISCONNECTED:
         {
             m_conn_handle_central = BLE_CONN_HANDLE_INVALID;
-            BleCentralScanStart();
+//            BleCentralScanStart();
+            BleCentralScanStop();
         } break; // BLE_GAP_EVT_DISCONNECTED
 
         case BLE_GAP_EVT_ADV_REPORT:

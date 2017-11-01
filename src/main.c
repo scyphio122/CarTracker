@@ -39,6 +39,7 @@
 #include "scheduler.h"
 #include "fifo.h"
 #include "request_fifos.h"
+#include "file_system.h"
 //#include "nfc.h"
 /*
  *
@@ -97,6 +98,8 @@ void InitDeviceData()
     memcpy(&gsmOwnerDeviceNumber, (uint32_t*)GSM_OWNER_PHONE_NUMBER_ADDRESS    , sizeof(uint64_t));
     memcpy(&deviceId            , (uint32_t*)DEVICE_ID                         , sizeof(uint32_t));
     memcpy(mainEncryptionKey    , (uint32_t*)CRYPTO_MAIN_KEY_ADDRESS           , CRYPTO_KEY_SIZE);
+
+    Mem_Org_Init();
 }
 
 __attribute__((optimize("O0")))
@@ -142,6 +145,10 @@ int main(void)
 	GsmGpsInit();
     GpioteInit();
 
+    if (!CryptoCheckMainKey())
+    {
+        CryptoGenerateAndStoreMainKey();
+    }
 //
 	GpsPowerOn();
 
@@ -165,10 +172,7 @@ int main(void)
 //    ExtFlashReadPage(0x1000, b, 64);
 
     // Check if the Main Key exists
-//    if (!CryptoCheckMainKey())
-//    {
-//        CryptoGenerateAndStoreMainKey();
-//    }
+
 
 
 

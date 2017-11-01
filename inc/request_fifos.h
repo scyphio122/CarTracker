@@ -14,6 +14,10 @@
 typedef enum
 {
     E_SYSTEM_SEND_SMS_WITH_LOCATION,
+    E_SYSTEM_START_NEW_TRACK,
+    E_SYSTEM_STOP_NEW_TRACK,
+
+    E_SYSTEM_SYNCHRONIZE_TIME_WITH_GSM
 }system_commands_e;
 
 uint32_t BleUartTaskFifoInit();

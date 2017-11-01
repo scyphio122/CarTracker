@@ -31,6 +31,6 @@ extern volatile uint32_t scheduler_current_time_ms;
 
 scheduler_error_code_e SchedulerCheckOperations();
 scheduler_error_code_e SchedulerAddOperation(void (*callback)(), volatile uint32_t timeMsFromNow, volatile uint8_t* taskIndex, bool isCyclic);
-scheduler_error_code_e SchedulerCancelOperation(uint8_t taskIndex);
+scheduler_error_code_e SchedulerCancelOperation(volatile uint8_t* taskIndex);
 scheduler_error_code_e ScheduleExecutePendingOperations();
 #endif /* UTILS_SCHEDULER_H_ */

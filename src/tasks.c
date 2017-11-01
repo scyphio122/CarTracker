@@ -14,13 +14,23 @@
 #include "scheduler.h"
 #include <string.h>
 #include "parsing_utils.h"
+#include "file_system.h"
+#include "ble_central.h"
 
 volatile bool       isTrackInProgress = false;
 volatile bool       isAlarmActivated = true;
 volatile bool       isAlarmTriggered = false;
+volatile uint32_t   gpsSamplingPeriodMs = 10 * 1000;
+volatile int8_t     gpsSamplingTaskId = -1;
+volatile uint32_t   alarmTimeoutMs  = 60 * 1000;
 volatile uint32_t   alarmSmsPeriodMs = 10 * 60 * 1000;
 volatile int8_t     alarmTimeoutTaskId = -1;
 volatile int8_t     alarmTaskId = -1;
+
+void TaskScanForKeyTag()
+{
+    BleCentralScanStart();
+}
 
 void TaskGpsGetSample(void)
 {
@@ -28,6 +38,7 @@ void TaskGpsGetSample(void)
     GpsRequestMessage(GPS_MSG_GGA);
     GpsRequestMessage(GPS_MSG_VTG);
     GsmHttpSendSample(&gpsLastSample);
+//    Mem_Org_Store_Sample();
 }
 
 void TaskAlarmSendLocation()
@@ -69,25 +80,35 @@ void TaskAlarmTimeout()
 
 void TaskDeactivateAlarm()
 {
-    SchedulerCancelOperation(alarmTimeoutTaskId);
+    SchedulerCancelOperation(&alarmTimeoutTaskId);
     isAlarmTriggered = false;
 }
 
 void TaskAbortAlarm()
 {
-    SchedulerCancelOperation(alarmTaskId);
-    alarmTaskId = -1;
+    SchedulerCancelOperation(&alarmTaskId);
     isAlarmTriggered = false;
     isAlarmActivated = true;
 }
 
 void TaskStartNewTrack()
 {
-
+    if (!isTrackInProgress)
+    {
+        TaskScanForKeyTag();
+        Mem_Org_Track_Start_Storage();
+        SchedulerAddOperation(TaskAlarmTimeout, alarmTimeoutMs, &alarmTimeoutTaskId, false);
+        SchedulerAddOperation(TaskGpsGetSample, gpsSamplingPeriodMs, &gpsSamplingTaskId, true);
+        GsmHttpSendStartTrack();
+        isTrackInProgress = true;
+    }
 }
 
 void TaskEndCurrentTrack()
 {
-
+    Mem_Org_Track_Stop_Storage();
+    SchedulerCancelOperation(&gpsSamplingTaskId);
+    GsmHttpEndTrack();
+    isTrackInProgress = false;
 }
 

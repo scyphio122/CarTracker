@@ -51,8 +51,14 @@ void GsmSmsDelete(int smsIndex);
 
 void GsmSmsDeleteAll();
 
+void GsmSynchronizeTime();
+
 gsm_error_e GsmHttpSendMessage(uint8_t* data, uint32_t dataSize);
 
+gsm_error_e GsmHttpSendStartTrack();
+
 gsm_error_e GsmHttpSendSample(gps_sample_t* sample);
+
+gsm_error_e GsmHttpEndTrack();
 
 #endif /* UTILS_GSM_H_ */

@@ -18,6 +18,7 @@
 #include "request_fifos.h"
 #include "crypto.h"
 #include "tasks.h"
+#include "ble_hci.h"
 
 ble_uart_t                  m_ble_uart;
 
@@ -78,6 +79,7 @@ uint32_t _BleUartRxHandler(uint8_t* p_data, uint8_t data_size)
         case E_BLE_UART_DEACTIVATE_ALARM:
         {
             TaskDeactivateAlarm();
+            sd_ble_gap_disconnect(m_conn_handle_central, BLE_HCI_LOCAL_HOST_TERMINATED_CONNECTION );
         }break;
 
         default:

@@ -332,13 +332,24 @@ void GsmSynchronizeTime()
     rtc_time_t time;
     rtc_date_t date;
 
-    memset(timeBuf, 0, sizeof(timeBuf));
-    GsmUartSendCommand(AT_GSM_QUERY_LAST_NETWORK_TIME, sizeof(AT_GSM_QUERY_LAST_NETWORK_TIME), timeBuf);
+    do
+    {
+        memset(timeBuf, 0, sizeof(timeBuf));
+        GsmUartSendCommand(AT_GSM_QUERY_LAST_NETWORK_TIME, sizeof(AT_GSM_QUERY_LAST_NETWORK_TIME), timeBuf);
 
-    buf = strstr(timeBuf, "\"");
-    buf++;
-    sscanf(buf, "%d/%d/%d,%d:%d:%d%c%d%s", &date.year, &date.month, &date.day, &time.hour, &time.minute, &time.second, dummy, &timeZone, dummy + 1);
-//    time.hour += timeZone;
+        buf = strstr(timeBuf, "\"");
+        buf++;
+        if (*buf == '\"')
+        {
+            SystickDelayMs(100);
+            continue;
+        }
+
+        sscanf(buf, "%d/%d/%d,%d:%d:%d%c%d%s", &date.year, &date.month, &date.day, &time.hour, &time.minute, &time.second, dummy, &timeZone, dummy + 1);
+        time.hour += 1;
+
+        break;
+    } while (1);
 
     date.year += 2000;
     RtcSetTimestamp(RtcConvertDateTimeToTimestamp(&time, &date));

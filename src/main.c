@@ -35,7 +35,12 @@
 #include "pinout.h"
 #include "gsm.h"
 #include "gps.h"
-
+#include "GPIOTE.h"
+#include "scheduler.h"
+#include "fifo.h"
+#include "request_fifos.h"
+#include "file_system.h"
+//#include "nfc.h"
 /*
  *
  * Print a greeting message on standard output and exit.
@@ -52,7 +57,6 @@
  */
 
 nrf_nvic_state_t nrf_nvic_state = {0};
-
 void POWER_CLOCK_IRQHandler()
 {
 	NRF_CLOCK->EVENTS_HFCLKSTARTED = 0;
@@ -88,6 +92,16 @@ void NVICInit()
 	NVIC_SetPriorityGrouping(0);
 }
 
+void InitDeviceData()
+{
+    memcpy(&gsmDeviceNumber     , (uint32_t*)GSM_DEVICE_PHONE_NUMBER_ADDRESS   , sizeof(uint64_t));
+    memcpy(&gsmOwnerDeviceNumber, (uint32_t*)GSM_OWNER_PHONE_NUMBER_ADDRESS    , sizeof(uint64_t));
+    memcpy(&deviceId            , (uint32_t*)DEVICE_ID                         , sizeof(uint32_t));
+    memcpy(mainEncryptionKey    , (uint32_t*)CRYPTO_MAIN_KEY_ADDRESS           , CRYPTO_KEY_SIZE);
+
+//    Mem_Org_Init();
+}
+
 __attribute__((optimize("O0")))
 int main(void)
 {
@@ -106,6 +120,8 @@ int main(void)
 	AdvertisingInit();
 	BleCentralInit();
 
+	InitDeviceData();
+
 //	AdvertisingStart();
 //    BleCentralScanStart();
 #endif
@@ -115,38 +131,52 @@ int main(void)
 	nrf_gpio_cfg_output(DEBUG_2_PIN_PIN);
 	nrf_gpio_pin_clear(DEBUG_2_PIN_PIN);
 
+//	rtc_time_t time;
+//	rtc_date_t date;
+//	time.hour = 21;
+//	time.minute = 18;
+//	time.second = 34;
+//
+//	date.day = 30;
+//	date.month = 10;
+//	date.year = 2017;
+//	uint32_t timestamp = RtcConvertDateTimeToTimestamp(&time, &date);
 //	IntFlashErasePage(PERSISTENT_CONFIG_PAGE_ADDRESS);
 	GsmGpsInit();
+    GpioteInit();
 
+
+    if (!CryptoCheckMainKey())
+    {
+        CryptoGenerateAndStoreMainKey();
+    }
+//
 	GpsPowerOn();
 
-	do
-	{
-	    GpsGetData();
-	    SystickDelayMs(5000);
-	}while (1);
+//	do
+//	{
+// 	    GpsGetData();
+//	    SystickDelayMs(5000);
+//	}while (1);
 
-    nrf_gpio_cfg_output(15);
-    nrf_gpio_cfg_output(14);
-    nrf_gpio_cfg_output(NFC_CS_PIN);
-    nrf_gpio_pin_set(NFC_CS_PIN);
-
+//	NfcInit();
+//
+//	NfcPowerOn();
+//	SystickDelayMs(1);
+//	NfcTxRxHalfPower();
 //	ExtFlashInit();
-
+//
 //    ExtFlashTurnOn(EXT_FLASH_PROGRAM_OP);
+//    uint8_t data[64] = "Litwo, Ojczyzno moja, Ty jestes jak zdrowie, Ten tylko sie dowie";
+//    uint8_t b[64];
+//    ExtFlashProgramPageThroughBufferWithoutPreerase(0x1000, data, 64);
+//    ExtFlashReadPage(0x1000, b, 64);
 
     // Check if the Main Key exists
-//    if (!CryptoCheckMainKey())
-//    {
-//        CryptoGenerateAndStoreMainKey();
-//    }
 
 
-    /*uint8_t data[64] = "Litwo, Ojczyzno moja, Ty jestes jak zdrowie, Ten tylko sie dowie";
-    uint8_t b[64];
-    ExtFlashProgramPageThroughBufferWithoutPreerase(0x1000, data, 64);
-    ExtFlashReadPage(0x1000, b, 64);
-*/
+
+
 //    uint8_t dataEncrypted[64];
 //    uint8_t dataDecrypted[64];
 //    uint8_t iv[16];
@@ -179,26 +209,16 @@ int main(void)
 //    uint32_t encryptTime = (encryptEnd - encryptStart);
 //    uint32_t decryptTime = decryptEnd - decryptStart;
 
-//	uint32_t retcode = 0;
-//	retcode = IntFlashStoreWord(0xDEADBEEF, (uint32_t*)0x30000);
-//	retcode = IntFlashStoreWord(0x12345678, (uint32_t*)0x30004);
-//	retcode = IntFlashErasePage((uint32_t*)0x30000);
-//	UartConfig(UART_BAUDRATE_BAUDRATE_Baud9600, UART_CONFIG_PARITY_Included, UART_CONFIG_HWFC_Disabled);
-//	UartEnable();
-//	UartSendDataSync("Hello World, it's nRF52!", sizeof("Hello World, it's nRF52!"));
-//
-//	SpiConfig(NRF_SPI0, SPI_FREQUENCY_FREQUENCY_M8, SPI_CONFIG_ORDER_MsbFirst, SPI_CONFIG_CPHA_Leading, SPI_CONFIG_CPOL_ActiveHigh);
-//	SpiEnable(NRF_SPI0);
-//	SpiWrite(NRF_SPI0, "Hello World, it's nRF52!", sizeof("Hello World, it's nRF52!"));
-//	UartReadDataEndCharSync(buf, '\n');M
-
 	while(1)
 	{
 	    sd_app_evt_wait();
-//	    BleUartServicePendingTasks();
-//		RTCDelay(NRF_RTC1, RTC1_MS_TO_TICKS(1000));
-//		nrf_gpio_pin_toggle(17);
+
+	    ScheduleExecutePendingOperations();
+	    BleUartServicePendingTasks();
+        SystemServicePendingTasks();
 	}
 
   return 0;
 }
+
+

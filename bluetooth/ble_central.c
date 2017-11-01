@@ -19,8 +19,10 @@
 #include "ble_gattc.h"
 #include "nrf_sdh_ble.h"
 #include "ble_uart_service_central.h"
+#include "crypto.h"
 
 BLE_DB_DISCOVERY_DEF(m_db_disc);                                /**< DB discovery module instance. */
+
 
 /**
  * @brief Parses advertisement data, providing length and location of the field in case
@@ -238,7 +240,8 @@ void on_ble_central_evt(ble_evt_t const * p_ble_evt)
         case BLE_GAP_EVT_DISCONNECTED:
         {
             m_conn_handle_central = BLE_CONN_HANDLE_INVALID;
-            BleCentralScanStart();
+//            BleCentralScanStart();
+            BleCentralScanStop();
         } break; // BLE_GAP_EVT_DISCONNECTED
 
         case BLE_GAP_EVT_ADV_REPORT:
@@ -265,7 +268,10 @@ void on_ble_central_evt(ble_evt_t const * p_ble_evt)
 
                 if (err_code != NRF_SUCCESS)
                 {
+                    return;
                 }
+
+                BleUartAddPendingTask(E_BLE_UART_SEND_IV_ON_KEY_TAG_CONNECT);
             }
         } break; // BLE_GAP_ADV_REPORT
 

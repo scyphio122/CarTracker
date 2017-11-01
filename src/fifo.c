@@ -4,11 +4,11 @@
  *  Created on: 10 gru 2015
  *      Author: Konrad
  */
-#include "app_fifo.h"
 #include "fifo.h"
 #include "stdbool.h"
+#include <string.h>
 
-uint32_t FifoLeftSpace(app_fifo_t * p_fifo)
+uint32_t FifoLeftSpace(fifo_t * p_fifo)
 {
   uint32_t tmp = p_fifo->read_pos;
   return p_fifo->write_pos - tmp;
@@ -22,9 +22,14 @@ uint32_t FifoLeftSpace(app_fifo_t * p_fifo)
  * \param buf       - the buffer which will be attached to the fifo
  * \param buf_size  - the size of the buffer which will be attached to the fifo
  */
-void FifoInit(app_fifo_t* fifo, uint8_t* buf, uint16_t buf_size)
+void FifoInit(fifo_t* fifo, void* buf, uint16_t buf_size, uint8_t word_size)
 {
-    app_fifo_init(fifo, buf, buf_size);
+//    app_fifo_init(fifo, buf, buf_size);
+    fifo->p_buf = buf;
+    fifo->buf_size_mask = buf_size;
+    fifo->word_size = word_size;
+    fifo->read_pos = 0;
+    fifo->write_pos = 0;
 }
 
 /**
@@ -32,7 +37,7 @@ void FifoInit(app_fifo_t* fifo, uint8_t* buf, uint16_t buf_size)
  *
  * \param fifo - fifo to clear
  */
-inline void FifoClear(app_fifo_t* fifo)
+inline void FifoClear(fifo_t* fifo)
 {
     fifo->read_pos = 0;
     fifo->write_pos = 0;
@@ -44,9 +49,14 @@ inline void FifoClear(app_fifo_t* fifo)
  * \param fifo - the fifo from which the byte is to be extracted
  * \param byte - pointer to the single byte buffer
  */
-inline void FifoGet(app_fifo_t* fifo, void* byte)
+inline void FifoGet(fifo_t* fifo, void* data)
 {
-    app_fifo_get(fifo, byte);
+    memcpy((uint8_t*)data, &((uint8_t*)fifo->p_buf)[fifo->read_pos*fifo->word_size], fifo->word_size);
+    fifo->read_pos++;
+    if (fifo->read_pos == fifo->buf_size_mask)
+    {
+        fifo->read_pos = 0;
+    }
 }
 
 /**
@@ -54,7 +64,7 @@ inline void FifoGet(app_fifo_t* fifo, void* byte)
  * @param fifo
  * @param byte
  */
-inline uint8_t FifoPeek(app_fifo_t* fifo, uint16_t index)
+inline uint32_t FifoPeek(fifo_t* fifo, uint16_t index)
 {
     int diff = fifo->write_pos - index - 1;
     if (diff < 0)
@@ -62,19 +72,23 @@ inline uint8_t FifoPeek(app_fifo_t* fifo, uint16_t index)
         diff += fifo->buf_size_mask;
     }
 
-    return fifo->p_buf[diff];
+    return ((uint8_t*)fifo->p_buf)[diff*fifo->word_size];
 }
 
 /**
- * \brief Put the byte in the fifo
+ * \brief Put the data in the fifo
  *
  * \param fifo - the FIFO where the byte is to be put
- * \param byte - the byte to be put
+ * \param data - the data to be put
  */
-inline void FifoPut(app_fifo_t* fifo, uint8_t byte)
+inline void FifoPut(fifo_t* fifo, uint32_t data)
 {
-    app_fifo_put(fifo, byte);
-    fifo->p_buf[fifo->write_pos] = 0;
+    memcpy(&(((uint8_t*)fifo->p_buf)[fifo->write_pos*fifo->word_size]), &data, fifo->word_size);
+    fifo->write_pos++;
+    if (fifo->write_pos > fifo->buf_size_mask)
+        fifo->write_pos = 0;
+
+    ((uint8_t*)fifo->p_buf)[fifo->write_pos] = 0;
 }
 
 /**
@@ -85,7 +99,7 @@ inline void FifoPut(app_fifo_t* fifo, uint8_t byte)
  * \return      true - if fifo empty
  *              false - if fifo contains some data
  */
-inline uint32_t FifoIsEmpty(app_fifo_t* fifo)
+inline uint32_t FifoIsEmpty(fifo_t* fifo)
 {
     if(fifo->read_pos == fifo->write_pos)
         return true;

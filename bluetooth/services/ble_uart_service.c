@@ -15,7 +15,10 @@
 #include "RTC.h"
 #include "fifo.h"
 #include "app_fifo.h"
-
+#include "request_fifos.h"
+#include "crypto.h"
+#include "tasks.h"
+#include "ble_hci.h"
 
 ble_uart_t                  m_ble_uart;
 
@@ -30,33 +33,62 @@ static uint8_t*             ble_data_ptr;                                   /**<
 static uint8_t*             ble_current_data_ptr;
 static volatile uint8_t     ble_uart_data_dynamically_allocated;
 
-static app_fifo_t           ble_uart_pending_requests_fifo;
-static uint8_t              ble_uart_pending_requests_fifo_buffer[16];
-
-uint32_t BleUartAddPendingTask(ble_uart_communication_commands_e command)
+/**
+ * This function is called when the write event from central is generated. Depending on the central's request code the appropriate action is triggered
+ *
+ * \param p_data - pointer to the data sent from central to the device
+ * \param data_size - size of data sent from central to the device
+ */
+uint32_t _BleUartRxHandler(uint8_t* p_data, uint8_t data_size)
 {
-    FifoPut(&ble_uart_pending_requests_fifo, command);
+    uint8_t request_code = p_data[0];
+    uint32_t err_code = 0;
+    uint8_t packet[16];
 
-    return NRF_SUCCESS;
-}
-
-uint32_t BleUartServicePendingTasks()
-{
-    ble_uart_communication_commands_e command;
-    while (!FifoIsEmpty(&ble_uart_pending_requests_fifo))
+    // If data is encrypted - decrypt it
+    if (request_code & 0x80)
     {
-        FifoGet(&ble_uart_pending_requests_fifo, (uint8_t*)&command);
-
-        switch (command)
+        if (m_conn_handle_central)
         {
-            case E_TEST:
-            {
-                uint32_t size = sizeof("Litwo, Ojczyzno moja! Ile Cie trzeba cenic");
-                char* test = malloc(size);
-                memcpy(test, "Litwo, Ojczyzno moja! Ile Cie trzeba cenic", size);
-                BleUartDataIndicate(m_conn_handle_peripheral, E_TEST, test, size, true);
-            }break;
+            CryptoCFBDecryptData(p_data + 2, CryptoGetCurrentInitialisingVector(), mainEncryptionKey, CRYPTO_KEY_SIZE, packet, 16);
         }
+    }
+    else
+    {
+        memcpy(packet, p_data+2, sizeof(packet));
+    }
+
+    switch(request_code)
+    {
+        case E_BLE_UART_GET_TIMESTAMP:
+        {
+            uint32_t timestamp = RtcGetTimestamp();
+            BleUartDataIndicate(m_conn_handle_peripheral,
+                                (uint8_t)E_BLE_UART_GET_TIMESTAMP,
+                                &timestamp,
+                                sizeof(timestamp),
+                                false);
+        }break;
+        case E_BLE_UART_SET_TIMESTAMP:
+        {
+            uint32_t timestamp = 0;
+            memcpy(&timestamp, p_data + 1, sizeof(uint32_t));
+            RtcSetTimestamp(timestamp);
+        }break;
+
+        case E_BLE_UART_DEACTIVATE_ALARM:
+        {
+            TaskDeactivateAlarm();
+            sd_ble_gap_disconnect(m_conn_handle_central, BLE_HCI_LOCAL_HOST_TERMINATED_CONNECTION );
+        }break;
+
+        default:
+        {
+            uint32_t* paramsAddress = malloc(20);
+            memcpy(&paramsAddress, p_data+2, 18);
+            BleUartAddPendingTask(request_code);
+
+        }break;
     }
 
     return NRF_SUCCESS;
@@ -295,28 +327,7 @@ static uint32_t  _BleUartNotifyWaitTillPacketInProgress()
 //    timeout_flag = 0;
     return NRF_SUCCESS;;
 }
-/**
- * This function is called when the write event from central is generated. Depending on the central's request code the appropriate action is triggered
- *
- * \param p_data - pointer to the data sent from central to the device
- * \param data_size - size of data sent from central to the device
- */
-static uint32_t _BleUartRxHandler(uint8_t* p_data, uint8_t data_size)
-{
-    uint8_t request_code = p_data[0];
-    uint32_t err_code = 0;
 
-    BleUartAddPendingTask(E_TEST);
-
-    switch(request_code)
-    {
-
-        default:
-            break;
-    }
-
-    return NRF_SUCCESS;
-}
 /**
  *  \brief This function sends single packet (up to 20 bytes) of data with BLE
  *
@@ -924,7 +935,7 @@ uint32_t BleUartServiceInit(ble_uart_t * p_uart, const ble_uart_init_t * p_uart_
         return err_code;
     }
 
-    FifoInit(&ble_uart_pending_requests_fifo, ble_uart_pending_requests_fifo_buffer, sizeof(ble_uart_pending_requests_fifo_buffer));
+    BleUartTaskFifoInit();
     return NRF_SUCCESS;
 }
 

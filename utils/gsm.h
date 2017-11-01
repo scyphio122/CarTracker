@@ -10,12 +10,20 @@
 
 #include <stdint-gcc.h>
 #include <stdbool.h>
+#include "gps.h"
+
+#define GSM_SMS_COMMAND_GET_LOCATION        "GET LOCATION"
+#define GSM_SMS_COMMAND_ABORT_ALARM         "ABORT ALARM"
 
 typedef enum
 {
     GSM_OK,
     GSM_ERROR
 }gsm_error_e;
+
+extern uint64_t    gsmDeviceNumber;
+extern uint64_t    gsmOwnerDeviceNumber;
+extern uint32_t    deviceId;
 
 #define GSM_FIXED_BAUDRATE_SET      (uint32_t)(0xFFFFFFFE)
 
@@ -37,6 +45,20 @@ void GsmSmsInit();
 
 void GsmSmsSend(char* telNum, const char* text);
 
+void GsmSmsReadAll();
 
+void GsmSmsDelete(int smsIndex);
+
+void GsmSmsDeleteAll();
+
+void GsmSynchronizeTime();
+
+gsm_error_e GsmHttpSendMessage(uint8_t* data, uint32_t dataSize);
+
+gsm_error_e GsmHttpSendStartTrack();
+
+gsm_error_e GsmHttpSendSample(gps_sample_t* sample);
+
+gsm_error_e GsmHttpEndTrack();
 
 #endif /* UTILS_GSM_H_ */

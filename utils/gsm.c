@@ -18,6 +18,31 @@
 #include "internal_flash.h"
 #include "internal_memory_organization.h"
 #include <string.h>
+#include "parsing_utils.h"
+#include "gps.h"
+#include "tasks.h"
+#include "scheduler.h"
+#include "request_fifos.h"
+#include <time.h>
+#include "RTC.h"
+
+uint64_t    gsmDeviceNumber;
+uint64_t    gsmOwnerDeviceNumber = 48691494830;
+uint32_t    deviceId = 0;
+
+static void _GsmExecuteSmsTask(char* smsText)
+{
+    if (strcmp(smsText, GSM_SMS_COMMAND_GET_LOCATION) == 0)
+    {
+//        TaskAlarmSendLocation();
+        SystemAddPendingTask(E_SYSTEM_SEND_SMS_WITH_LOCATION);
+    }
+    else
+    if (strcmp(smsText, GSM_SMS_COMMAND_ABORT_ALARM) == 0)
+    {
+        TaskAbortAlarm();
+    }
+}
 
 static void _GsmWaitForNetworkLogging()
 {
@@ -113,7 +138,7 @@ void GsmGpsInit()
         if (err == GSM_OK)
         {
             uint32_t t = GSM_FIXED_BAUDRATE_SET;
-            IntFlashUpdatePage((uint8_t*)(&t), sizeof(t), GSM_BAUDRATE_CONFIG_ADDRESS);
+            IntFlashUpdatePage((uint8_t*)(&t), sizeof(t), (uint32_t*)GSM_BAUDRATE_CONFIG_ADDRESS);
         }
     }
     else
@@ -128,7 +153,7 @@ void GsmGpsInit()
 
     GsmBlockIncommingCalls();
 
-
+    GsmSynchronizeTime();
 }
 
 void GsmBatteryOn()
@@ -168,6 +193,8 @@ gsm_error_e GsmUartSendCommand(void* command, uint16_t commandSize, char* respon
     static uint8_t cmd[32];
     char* success = NULL;
     char* error = NULL;
+    uint8_t timeoutId = 0;
+
     memcpy(cmd, command, commandSize - 1);
     cmd[commandSize - 1] = '\n';
     FifoClear(&uartRxFifo);
@@ -177,12 +204,15 @@ gsm_error_e GsmUartSendCommand(void* command, uint16_t commandSize, char* respon
 
     UartSendDataSync(cmd, commandSize);
 
+    RTCTimeout(NRF_RTC1, RTC1_MS_TO_TICKS(1000), &timeoutId);
     do
     {
         sd_app_evt_wait();
         success = strstr(uartRxFifo.p_buf, "OK");
         error = strstr(uartRxFifo.p_buf, "ERROR");
-    }while(success == NULL && error == NULL);
+    }while(success == NULL && error == NULL && rtcTimeoutArray[timeoutId].timeoutTriggeredFlag == false);
+
+    RTCClearTimeout(NRF_RTC1, timeoutId);
 
     UartRxStop();
     UartDisable();
@@ -219,6 +249,8 @@ void GsmSmsInit()
     GsmUartSendCommand(AT_GSM_SET_SMS_CHARSET("GSM"), sizeof(AT_GSM_SET_SMS_CHARSET("GSM")), NULL);
 }
 
+
+
 void GsmSmsSend(char* telNum, const char* text)
 {
     char textMsg[256];
@@ -228,3 +260,107 @@ void GsmSmsSend(char* telNum, const char* text)
     GsmUartSendCommand(textMsg, strlen(textMsg) + 1, NULL);
 }
 
+void GsmSmsReadAll()
+{
+    char command[16];
+    char smsIndex[3];
+    char smsText[256];
+    gsm_error_e err;
+
+    memset(smsIndex, 0, sizeof(smsIndex));
+    memcpy(command, AT_GSM_READ_ALL_SMS_MESSAGES, sizeof(AT_GSM_READ_ALL_SMS_MESSAGES));
+
+    for (uint8_t i=0; i<10; ++i)
+    {
+        memset(smsText, 0, sizeof(smsText));
+        sscanf(smsIndex, "%d", i);
+        strcat(command, smsIndex);
+        err = GsmUartSendCommand(command, strlen(command), smsText);
+
+        if (err == GSM_OK)
+        {
+            // Find the telephone number
+            char* temp = strstr(smsText, ",\"+");
+            temp += 3;
+            char* telNumEnd = strstr(temp, "\",");
+
+            int64_t telNum = _atoi(temp, (telNumEnd - temp));
+
+            // If sms is not from the device owner - ignore it
+            if (telNum != gsmOwnerDeviceNumber)
+            {
+                continue;
+            }
+
+            // Go to the text message
+            temp = strstr(temp, "\r");
+            // Temp points to the first caracter of the actual sms text
+            temp += 2;
+            // Find the '\r\n' characters at the and of the sms text and put there the string terminating '\0' character
+            char* smsTextEnd = strstr(temp, "\r\n");
+            *smsTextEnd = '\0';
+            _GsmExecuteSmsTask(temp);
+            GsmSmsDeleteAll();
+            break;
+        }
+    }
+}
+
+void GsmSmsDelete(int smsIndex)
+{
+    char command[16];
+    char index[3];
+    memcpy(command, AT_GSM_DELETE_SMS_MESSAGE, sizeof(AT_GSM_DELETE_SMS_MESSAGE));
+
+    sscanf(index, "%d", smsIndex);
+    strcat(command, index);
+
+    GsmUartSendCommand(command, strlen(command), NULL);
+}
+
+void GsmSmsDeleteAll()
+{
+    GsmUartSendCommand(AT_GSM_DELETE_ALL_SMS_MESSAGES, sizeof(AT_GSM_DELETE_ALL_SMS_MESSAGES), NULL);
+}
+
+void GsmSynchronizeTime()
+{
+    char timeBuf[64];
+    char dummy[5];
+    char* buf;
+    int8_t timeZone = 0;
+    rtc_time_t time;
+    rtc_date_t date;
+
+    memset(timeBuf, 0, sizeof(timeBuf));
+    GsmUartSendCommand(AT_GSM_QUERY_LAST_NETWORK_TIME, sizeof(AT_GSM_QUERY_LAST_NETWORK_TIME), timeBuf);
+
+    buf = strstr(timeBuf, "\"");
+    buf++;
+    sscanf(buf, "%d/%d/%d,%d:%d:%d%c%d%s", &date.year, &date.month, &date.day, &time.hour, &time.minute, &time.second, dummy, &timeZone, dummy + 1);
+//    time.hour += timeZone;
+
+    date.year += 2000;
+    RtcSetTimestamp(RtcConvertDateTimeToTimestamp(&time, &date));
+}
+
+gsm_error_e GsmHttpSendMessage(uint8_t* data, uint32_t dataSize)
+{
+    return GSM_OK;
+}
+
+gsm_error_e GsmHttpSendStartTrack()
+{
+    return GSM_OK;
+}
+
+gsm_error_e GsmHttpEndTrack()
+{
+    return GSM_OK;
+}
+
+gsm_error_e GsmHttpSendSample(gps_sample_t* sample)
+{
+
+    return GSM_OK;
+}

@@ -7,7 +7,7 @@
 
 #ifndef HARDWARE_UART_H_
 #define HARDWARE_UART_H_
-#include "app_fifo.h"
+#include "fifo.h"
 
 typedef enum
 {
@@ -16,7 +16,7 @@ typedef enum
 
 }e_uart_error;
 
-extern app_fifo_t uartRxFifo;
+extern fifo_t uartRxFifo;
 
 void UartConfig(uint32_t baudrateBitfield, uint32_t parity, uint32_t hardwareFlowControl);
 void UartEnable();

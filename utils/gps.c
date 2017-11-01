@@ -16,7 +16,7 @@
 #include "RTC.h"
 #include "parsing_utils.h"
 
-gsm_sample_t gpsLastSample;
+gps_sample_t gpsLastSample;
 
 static int _GpsCalcChecsum(uint8_t* messageStart)
 {

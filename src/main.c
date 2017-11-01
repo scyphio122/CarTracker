@@ -37,6 +37,8 @@
 #include "gps.h"
 #include "GPIOTE.h"
 #include "scheduler.h"
+#include "fifo.h"
+#include "request_fifos.h"
 //#include "nfc.h"
 /*
  *
@@ -89,6 +91,14 @@ void NVICInit()
 	NVIC_SetPriorityGrouping(0);
 }
 
+void InitDeviceData()
+{
+    memcpy(&gsmDeviceNumber     , (uint32_t*)GSM_DEVICE_PHONE_NUMBER_ADDRESS   , sizeof(uint64_t));
+    memcpy(&gsmOwnerDeviceNumber, (uint32_t*)GSM_OWNER_PHONE_NUMBER_ADDRESS    , sizeof(uint64_t));
+    memcpy(&deviceId            , (uint32_t*)DEVICE_ID                         , sizeof(uint32_t));
+    memcpy(mainEncryptionKey    , (uint32_t*)CRYPTO_MAIN_KEY_ADDRESS           , CRYPTO_KEY_SIZE);
+}
+
 __attribute__((optimize("O0")))
 int main(void)
 {
@@ -107,6 +117,7 @@ int main(void)
 	AdvertisingInit();
 	BleCentralInit();
 
+	InitDeviceData();
 
 //	AdvertisingStart();
 //    BleCentralScanStart();
@@ -134,14 +145,11 @@ int main(void)
 //
 	GpsPowerOn();
 
-	do
-	{
-//	    GpsGetData();
-	    memset(&gpsLastSample, 0, sizeof(gpsLastSample));
-	    GpsRequestMessage(GPS_MSG_GGA);
-	    GpsRequestMessage(GPS_MSG_VTG);
-	    SystickDelayMs(5000);
-	}while (1);
+//	do
+//	{
+// 	    GpsGetData();
+//	    SystickDelayMs(5000);
+//	}while (1);
 
 //	NfcInit();
 //
@@ -199,8 +207,10 @@ int main(void)
 	while(1)
 	{
 	    sd_app_evt_wait();
+
 	    ScheduleExecutePendingOperations();
 	    BleUartServicePendingTasks();
+        SystemServicePendingTasks();
 	}
 
   return 0;

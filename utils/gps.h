@@ -88,10 +88,9 @@ typedef struct
     uint16_t            acceleration;
     uint32_t            timestamp;
 
-}gsm_sample_t;
+}gps_sample_t;
 
-extern gsm_sample_t gpsLastSample;
-
+extern gps_sample_t gpsLastSample;
 
 void GpsPowerOn();
 

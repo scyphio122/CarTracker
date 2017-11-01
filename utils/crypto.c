@@ -17,7 +17,8 @@
 #include <string.h>
 #include <malloc.h>
 
-static uint8_t _lastKey[CRYPTO_KEY_SIZE];
+uint8_t currentInitialisingVector[CRYPTO_KEY_SIZE];
+uint8_t mainEncryptionKey[CRYPTO_KEY_SIZE];
 
 extern void AES_128_keyschedule(const uint8_t *, uint8_t *);
 extern void AES_128_keyschedule_dec(const uint8_t *, uint8_t *);
@@ -89,6 +90,17 @@ uint32_t CryptoGenerateAndStoreMainKey()
 
     return NRF_SUCCESS;
 }
+
+uint8_t* CryptoGetMainEncryptionKey()
+{
+    return mainEncryptionKey;
+}
+
+uint8_t* CryptoGetCurrentInitialisingVector()
+{
+    return currentInitialisingVector;
+}
+
 
 uint32_t CryptoECBEncryptData(uint8_t* dataToEncrypt,
                            uint16_t dataSize,

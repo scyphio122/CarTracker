@@ -34,7 +34,7 @@ static volatile bool 			s_uartIsReadEndCharacterUsed;
 static volatile e_uart_error 	s_uartErrno;
 
 static uint8_t                  uartRxFifoBuf[1024];
-app_fifo_t                      uartRxFifo;
+fifo_t                          uartRxFifo;
 
 void UARTE0_UART0_IRQHandler()
 {
@@ -366,5 +366,5 @@ void UartConfig(uint32_t baudrateBitfield, uint32_t parity, uint32_t hardwareFlo
 		NRF_UART0->PSELRTS = UART_RTS_PIN;
 	}
 
-	FifoInit(&uartRxFifo, uartRxFifoBuf, sizeof(uartRxFifoBuf));
+	FifoInit(&uartRxFifo, uartRxFifoBuf, sizeof(uartRxFifoBuf), sizeof(uint8_t));
 }

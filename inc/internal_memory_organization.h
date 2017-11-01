@@ -14,10 +14,15 @@
 #define INTERNAL_FLASH_PAGE_SIZE                    (uint16_t)0x1000
 #define FLASH_MEMORY_END_ADDRESS                    (uint32_t*)0x80000
 
-#define PERSISTENT_CONFIG_PAGE_ADDRESS              (uint32_t*)0x78000
+#define PERSISTENT_CONFIG_PAGE_ADDRESS              (uint32_t)0x78000
+
+#define CRYPTO_MAIN_KEY_ADDRESS                     (PERSISTENT_CONFIG_PAGE_ADDRESS)
+#define GSM_BAUDRATE_CONFIG_ADDRESS                 (CRYPTO_MAIN_KEY_ADDRESS + CRYPTO_KEY_SIZE)
+#define GSM_DEVICE_PHONE_NUMBER_ADDRESS             GSM_BAUDRATE_CONFIG_ADDRESS + sizeof(uint32_t)
+#define GSM_OWNER_PHONE_NUMBER_ADDRESS              GSM_DEVICE_PHONE_NUMBER_ADDRESS + sizeof(uint64_t)
+
+#define DEVICE_ID                                   GSM_OWNER_PHONE_NUMBER_ADDRESS + sizeof(uint64_t)
 
 #define INTERNAL_FLASH_SWAP_PAGE_ADDRESS            (uint32_t*)0x79000
 
-#define CRYPTO_MAIN_KEY_ADDRESS                     (PERSISTENT_CONFIG_PAGE_ADDRESS)
-#define GSM_BAUDRATE_CONFIG_ADDRESS                 (CRYPTO_MAIN_KEY_ADDRESS + CRYPTO_KEY_SIZE/sizeof(uint32_t))
 #endif /* INC_INTERNAL_MEMORY_ORGANIZATION_H_ */

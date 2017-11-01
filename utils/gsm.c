@@ -20,9 +20,13 @@
 #include <string.h>
 #include "parsing_utils.h"
 #include "gps.h"
+#include "tasks.h"
+#include "scheduler.h"
+#include "request_fifos.h"
 
 uint64_t    gsmDeviceNumber;
 uint64_t    gsmOwnerDeviceNumber = 48691494830;
+uint32_t    deviceId = 0;
 
 static void _GsmWaitForNetworkLogging()
 {
@@ -118,7 +122,7 @@ void GsmGpsInit()
         if (err == GSM_OK)
         {
             uint32_t t = GSM_FIXED_BAUDRATE_SET;
-            IntFlashUpdatePage((uint8_t*)(&t), sizeof(t), GSM_BAUDRATE_CONFIG_ADDRESS);
+            IntFlashUpdatePage((uint8_t*)(&t), sizeof(t), (uint32_t*)GSM_BAUDRATE_CONFIG_ADDRESS);
         }
     }
     else
@@ -132,8 +136,6 @@ void GsmGpsInit()
     GsmSmsInit();
 
     GsmBlockIncommingCalls();
-
-
 }
 
 void GsmBatteryOn()
@@ -224,32 +226,17 @@ void GsmSmsInit()
     GsmUartSendCommand(AT_GSM_SET_SMS_CHARSET("GSM"), sizeof(AT_GSM_SET_SMS_CHARSET("GSM")), NULL);
 }
 
-static void _GsmExecuteTask(char* smsText)
+static void _GsmExecuteSmsTask(char* smsText)
 {
     if (strcmp(smsText, GSM_SMS_COMMAND_GET_LOCATION) == 0)
     {
-        char telNum[12];
-//        sprintf(telNum, "%llu", gsmOwnerDeviceNumber);
-        _itoa(gsmOwnerDeviceNumber, telNum, sizeof(telNum));
-        char localization[64];
-        memset(localization, 0, sizeof(localization));
-        if (gpsLastSample.fixStatus == GPS_FIX_NO_FIX)
-        {
-            memcpy(localization, "No fix", sizeof("No fix"));
-        }
-        else
-        {
-            sprintf(localization, "Latitude: %d*%d.%d'%c;Longitutde: %d*%d.%d'%c",
-                    gpsLastSample.latitude.degrees,
-                    gpsLastSample.latitude.minutes,
-                    gpsLastSample.latitude.seconds,
-                    gpsLastSample.latitude.hemisphereDescriptor,
-                    gpsLastSample.longtitude.degrees,
-                    gpsLastSample.longtitude.minutes,
-                    gpsLastSample.longtitude.seconds,
-                    gpsLastSample.longtitude.hemisphereDescriptor);
-        }
-        GsmSmsSend(telNum, localization);
+//        TaskAlarmSendLocation();
+        SystemAddPendingTask(E_SYSTEM_SEND_SMS_WITH_LOCATION);
+    }
+    else
+    if (strcmp(smsText, GSM_SMS_COMMAND_ABORT_ALARM) == 0)
+    {
+        TaskAbortAlarm();
     }
 }
 
@@ -301,13 +288,11 @@ void GsmSmsReadAll()
             // Find the '\r\n' characters at the and of the sms text and put there the string terminating '\0' character
             char* smsTextEnd = strstr(temp, "\r\n");
             *smsTextEnd = '\0';
-            _GsmExecuteTask(temp);
+            _GsmExecuteSmsTask(temp);
             GsmSmsDeleteAll();
             break;
         }
     }
-
-
 }
 
 void GsmSmsDelete(int smsIndex)
@@ -327,3 +312,13 @@ void GsmSmsDeleteAll()
     GsmUartSendCommand(AT_GSM_DELETE_ALL_SMS_MESSAGES, sizeof(AT_GSM_DELETE_ALL_SMS_MESSAGES), NULL);
 }
 
+gsm_error_e GsmHttpSendMessage(uint8_t* data, uint32_t dataSize)
+{
+    return GSM_OK;
+}
+
+gsm_error_e GsmHttpSendSample(gps_sample_t* sample)
+{
+
+    return GSM_OK;
+}

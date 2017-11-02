@@ -16,9 +16,11 @@
 #include "fifo.h"
 #include "app_fifo.h"
 
-static uint8_t _nfcFifoBuffer[32];
-app_fifo_t nfcFifo;
-
+static uint8_t _nfcWriteFifoBuffer[32];
+fifo_t nfcWriteFifo;
+static uint8_t _nfcReadFifoBuffer[32];
+fifo_t nfcReadFifo;
+volatile static bool _txInProgress;
 static nfc_state_e _nfcState = NFC_POWER_OFF;
 
 void NfcWriteRegister(uint8_t registerAddress, uint8_t data)
@@ -119,7 +121,8 @@ void NfcInit()
 
     NfcPowerOff();
 
-    FifoInit(&nfcFifo, _nfcFifoBuffer, sizeof(_nfcFifoBuffer));
+    FifoInit(&nfcWriteFifo, _nfcWriteFifoBuffer, sizeof(_nfcWriteFifoBuffer), sizeof(uint8_t));
+    FifoInit(&nfcReadFifo, _nfcReadFifoBuffer, sizeof(_nfcReadFifoBuffer), sizeof(uint8_t));
 }
 
 void NfcDeinit()
@@ -134,9 +137,9 @@ void NfcPowerOn()
 
     NfcLowPower();
 
-    NfcSetProtocol();
-
     NfcEnableRxCrcCheck(true);
+
+    NfcSetProtocol();
 }
 
 void NfcPowerOff()
@@ -166,7 +169,7 @@ void NfcStandby()
 
 void NfcLowPower()
 {
-    RTCDelay(NRF_RTC1, RTC1_US_TO_TICKS(32));
+    RTCDelay(NRF_RTC1, RTC1_US_TO_TICKS(64));
     NfcWriteRegister(NFC_CHIP_STATUS_REG_ADDRESS, NFC_CHIP_STATUS_LOW_POWER_NO_RX);
 
     _nfcState = NFC_LOW_POWER;
@@ -174,7 +177,7 @@ void NfcLowPower()
 
 void NfcRxOnly()
 {
-    RTCDelay(NRF_RTC1, RTC1_US_TO_TICKS(32));
+    RTCDelay(NRF_RTC1, RTC1_US_TO_TICKS(64));
     NfcWriteRegister(NFC_CHIP_STATUS_REG_ADDRESS, NFC_CHIP_STATUS_ONLY_RX);
 
     _nfcState = NFC_RX_ONLY;
@@ -182,7 +185,7 @@ void NfcRxOnly()
 
 void NfcTxRxHalfPower()
 {
-    RTCDelay(NRF_RTC1, RTC1_US_TO_TICKS(32));
+    RTCDelay(NRF_RTC1, RTC1_US_TO_TICKS(64));
     NfcWriteRegister(NFC_CHIP_STATUS_REG_ADDRESS, NFC_CHIP_STATUS_HALF_POWER);
 
     _nfcState = NFC_HALF_POWER;
@@ -190,7 +193,7 @@ void NfcTxRxHalfPower()
 
 void NfcTxRxFullPower()
 {
-    RTCDelay(NRF_RTC1, RTC1_US_TO_TICKS(32));
+    RTCDelay(NRF_RTC1, RTC1_US_TO_TICKS(64));
     NfcWriteRegister(NFC_CHIP_STATUS_REG_ADDRESS, NFC_CHIP_STATUS_FULL_POWER);
 
     _nfcState = NFC_FULL_POWER;
@@ -205,6 +208,8 @@ void NfcSetProtocol()
     regValue |= NFC_ISO_14443_A_106_KBPS_PROTOCOL;
 
     NfcWriteRegister(NFC_ISO_CTRL_REGISTER_ADDRESS, regValue);
+
+    NfcReadRegister(NFC_ISO_CTRL_REGISTER_ADDRESS, &regValue);
 }
 
 void NfcEnableRxCrcCheck(bool enabled)
@@ -282,23 +287,62 @@ void NfcIrqCallback()
 
             case NFC_IRQ_FIFO_HIGH_OR_LOW:
             {
+                if (_txInProgress)
+                {
+                    for (uint8_t i=0; (i<8); ++i)
+                    {
+                        uint8_t data = 0;
+                        int retval = FifoGet(&nfcWriteFifo, &data);
+                        if (retval == -1)
+                            break;
+
+                        NfcWriteRegister(NFC_FIFO_ADDRESS + i, data);
+                    }
+                }
 
             }break;
 
             case NFC_IRQ_RX_START:
             {
+                int8_t bytesToRead = NfcGetCurrentFifoCounter();
+                if (bytesToRead < 0)
+                    break;
 
+//                NfcReadBlock(NFC_FIFO_ADDRESS, )
                 NfcResetFifo();
             }break;
 
             case NFC_IRQ_END_OF_TX:
             {
+                _txInProgress = false;
                 NfcResetFifo();
             }break;
 
         }
 
         mask = 1 << i;
+    }
+}
+
+void NfcTransferData(uint8_t* data, uint8_t dataSize)
+{
+    if (dataSize > sizeof(_nfcWriteFifoBuffer))
+    {
+        while(1) __
+        {
+            WFE();
+        }
+    }
+
+    FifoClear(&fifo_t);
+    memcpy(_nfcWriteFifoBuffer, data, dataSize);
+    _txInProgress = true;
+
+    for (uint8_t i=0; (i<dataSize && i<12); ++i)
+    {
+        uint8_t data = 0;
+        FifoGet(&nfcWriteFifo, &data);
+        NfcWriteRegister(NFC_FIFO_ADDRESS + i, data);
     }
 }
 

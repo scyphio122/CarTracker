@@ -118,6 +118,7 @@ void NfcReadIrqStatus(uint8_t* status);
 
 void NfcIrqCallback();
 
+void NfcTransferData(uint8_t* data, uint8_t dataSize);
 
 #endif /* UTILS_NFC_H_ */
 

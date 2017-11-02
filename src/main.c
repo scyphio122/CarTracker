@@ -40,7 +40,7 @@
 #include "fifo.h"
 #include "request_fifos.h"
 #include "file_system.h"
-//#include "nfc.h"
+#include "nfc.h"
 /*
  *
  * Print a greeting message on standard output and exit.
@@ -120,6 +120,8 @@ int main(void)
 	AdvertisingInit();
 	BleCentralInit();
 
+	GsmGpsPinsInit();
+
 	InitDeviceData();
 
 //	AdvertisingStart();
@@ -131,17 +133,18 @@ int main(void)
 	nrf_gpio_cfg_output(DEBUG_2_PIN_PIN);
 	nrf_gpio_pin_clear(DEBUG_2_PIN_PIN);
 
-//	rtc_time_t time;
-//	rtc_date_t date;
-//	time.hour = 21;
-//	time.minute = 18;
-//	time.second = 34;
-//
-//	date.day = 30;
-//	date.month = 10;
-//	date.year = 2017;
-//	uint32_t timestamp = RtcConvertDateTimeToTimestamp(&time, &date);
-//	IntFlashErasePage(PERSISTENT_CONFIG_PAGE_ADDRESS);
+	ExtFlashInit();
+	ExtFlashTurnOff();
+
+    NfcInit();
+    NfcPowerOn();
+    NfcTxRxHalfPower();
+
+    while(1)
+    {
+        __WFE();
+    }
+
 	GsmGpsInit();
     GpioteInit();
 
@@ -159,11 +162,7 @@ int main(void)
 //	    SystickDelayMs(5000);
 //	}while (1);
 
-//	NfcInit();
-//
-//	NfcPowerOn();
-//	SystickDelayMs(1);
-//	NfcTxRxHalfPower();
+
 //	ExtFlashInit();
 //
 //    ExtFlashTurnOn(EXT_FLASH_PROGRAM_OP);

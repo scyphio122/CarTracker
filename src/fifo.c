@@ -49,14 +49,26 @@ inline void FifoClear(fifo_t* fifo)
  * \param fifo - the fifo from which the byte is to be extracted
  * \param byte - pointer to the single byte buffer
  */
-inline void FifoGet(fifo_t* fifo, void* data)
+inline int FifoGet(fifo_t* fifo, void* data)
 {
-    memcpy((uint8_t*)data, &((uint8_t*)fifo->p_buf)[fifo->read_pos*fifo->word_size], fifo->word_size);
+    // If fifo empty
+    if (fifo->read_pos == fifo->write_pos)
+    {
+        *data = 0;
+        return -1;
+    }
+    else
+    {
+        memcpy((uint8_t*)data, &((uint8_t*)fifo->p_buf)[fifo->read_pos*fifo->word_size], fifo->word_size);
+    }
+
     fifo->read_pos++;
     if (fifo->read_pos == fifo->buf_size_mask)
     {
         fifo->read_pos = 0;
     }
+
+    return 0;
 }
 
 /**

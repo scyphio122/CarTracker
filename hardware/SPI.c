@@ -26,14 +26,17 @@ static E_SPI_Type s_spi2_type;
 volatile static uint16_t s_spi0_bytes_to_send;
 volatile static uint16_t s_spi0_bytes_sent;
 static uint8_t*			 s_spi0_write_buffer;
+static volatile uint8_t  s_spi0_data_sent;
 
 volatile static uint16_t s_spi1_bytes_to_send;
 volatile static uint16_t s_spi1_bytes_sent;
 static uint8_t*			 s_spi1_write_buffer;
+static volatile uint8_t  s_spi1_data_sent;
 
 volatile static uint16_t s_spi2_bytes_to_send;
 volatile static uint16_t s_spi2_bytes_sent;
 static uint8_t*			 s_spi2_write_buffer;
+static volatile uint8_t  s_spi2_data_sent;
 
 volatile static uint16_t s_spi0_bytes_to_read;
 volatile static uint16_t s_spi0_bytes_received;
@@ -71,10 +74,14 @@ void SPIM0_SPIS0_TWIM0_TWIS0_SPI0_TWI0_IRQHandler()
 	}
 	else
 	{
+        dummy = NRF_SPI0->RXD;
 		if (s_spi0_bytes_sent < s_spi0_bytes_to_send)
 		{
-			dummy = NRF_SPI0->RXD;
 			NRF_SPI0->TXD = s_spi0_write_buffer[s_spi0_bytes_sent++];
+		}
+		else
+		{
+		    s_spi0_data_sent = 1;
 		}
 	}
 }
@@ -100,10 +107,14 @@ void SPIM1_SPIS1_TWIM1_TWIS1_SPI1_TWI1_IRQHandler()
 	}
 	else
 	{
+        dummy = NRF_SPI1->RXD;
 		if (s_spi1_bytes_sent < s_spi1_bytes_to_send)
 		{
-			dummy = NRF_SPI1->RXD;
 			NRF_SPI1->TXD = s_spi1_write_buffer[s_spi1_bytes_sent++];
+		}
+		else
+		{
+		    s_spi1_data_sent = true;
 		}
 	}
 }
@@ -129,10 +140,14 @@ void SPIM2_SPIS2_SPI2_IRQHandler()
 	}
 	else
 	{
+        dummy = NRF_SPI2->RXD;
 		if (s_spi2_bytes_sent < s_spi2_bytes_to_send)
 		{
-			dummy = NRF_SPI2->RXD;
 			NRF_SPI2->TXD = s_spi2_write_buffer[s_spi2_bytes_sent++];
+		}
+		else
+		{
+		    s_spi2_data_sent = 1;
 		}
 	}
 }
@@ -233,8 +248,20 @@ void SpiDisable(NRF_SPI_Type* spi)
 
 void SpiSwitchPolarityPhase(NRF_SPI_Type* spi, uint8_t cpol, uint8_t cpha)
 {
+    bool wasEnabled = 0;
+    if (spi->ENABLE)
+    {
+        wasEnabled = 1;
+        SpiDisable(spi);
+    }
+
     spi->CONFIG &= ~(SPI_CONFIG_CPHA_Msk | SPI_CONFIG_CPOL_Msk);
     spi->CONFIG |= (cpol << SPI_CONFIG_CPOL_Pos) | (cpha << SPI_CONFIG_CPHA_Pos);
+
+    if (wasEnabled)
+    {
+        SpiEnable(spi);
+    }
 }
 
 E_SPI_Errors SpiWrite(NRF_SPI_Type* spi, uint8_t* in_buf, uint16_t data_size)
@@ -249,13 +276,14 @@ E_SPI_Errors SpiWrite(NRF_SPI_Type* spi, uint8_t* in_buf, uint16_t data_size)
 			s_spi0_bytes_to_send = data_size;
 			s_spi0_write_buffer = in_buf;
 			s_spi0_is_reading = false;
+            s_spi0_data_sent = false;
 
 			NRF_SPI0->INTENSET = SPI_INTENSET_READY_Msk;
 			spi->TXD = in_buf[s_spi0_bytes_sent++];
 			if (data_size > 1)	// Write second byte due to double buffering of SPI TXD register
 				spi->TXD = in_buf[s_spi0_bytes_sent++];
 
-			while (s_spi0_bytes_sent < s_spi0_bytes_to_send)
+			while (!s_spi0_data_sent)
 			{
 #if SOFTDEVICE_ENABLED
 				sd_app_evt_wait();
@@ -272,14 +300,14 @@ E_SPI_Errors SpiWrite(NRF_SPI_Type* spi, uint8_t* in_buf, uint16_t data_size)
 			s_spi1_bytes_to_send = data_size;
 			s_spi1_write_buffer = in_buf;
 			s_spi1_is_reading = false;
+			s_spi1_data_sent = false;
 
 			NRF_SPI1->INTENSET = SPI_INTENSET_READY_Msk;
 			spi->TXD = in_buf[s_spi1_bytes_sent++];
 			if (data_size > 1)	// Write second byte due to double buffering of SPI TXD register
 				spi->TXD = in_buf[s_spi1_bytes_sent++];
 
-
-			while (s_spi1_bytes_sent < s_spi1_bytes_to_send)
+			while (!s_spi1_data_sent)
 			{
 #if SOFTDEVICE_ENABLED
 				sd_app_evt_wait();
@@ -296,13 +324,14 @@ E_SPI_Errors SpiWrite(NRF_SPI_Type* spi, uint8_t* in_buf, uint16_t data_size)
 			s_spi2_bytes_to_send = data_size;
 			s_spi2_write_buffer = in_buf;
 			s_spi2_is_reading = false;
+            s_spi2_data_sent = false;
 
 			NRF_SPI2->INTENSET = SPI_INTENSET_READY_Msk;
 			spi->TXD = in_buf[s_spi2_bytes_sent++];
 			if (data_size > 1)	// Write second byte due to double buffering of SPI TXD register
 				spi->TXD = in_buf[s_spi2_bytes_sent++];
 
-			while (s_spi2_bytes_sent < s_spi2_bytes_to_send)
+			while (!s_spi2_data_sent)
 			{
 #if SOFTDEVICE_ENABLED
 				sd_app_evt_wait();

@@ -12,6 +12,7 @@
 #include "pinout.h"
 #include "gsm.h"
 #include "nrf_nvic.h"
+#include "nrf.h"
 
 void GPIOTE_IRQHandler()
 {
@@ -26,6 +27,7 @@ void GPIOTE_IRQHandler()
     if (NRF_GPIOTE->EVENTS_IN[1])
     {
         NRF_GPIOTE->EVENTS_IN[1] = 0;
+        NfcIrqCallback();
     }
 
     // ACCELEROMETER INTERRUPT 1

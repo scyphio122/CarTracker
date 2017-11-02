@@ -80,7 +80,7 @@ static void _GsmWaitForInitStart()
     } while (1);
 }
 
-void GsmGpsInit()
+void GsmGpsPinsInit()
 {
     // VBAT off
     nrf_gpio_cfg_input(GSM_ENABLE_PIN, NRF_GPIO_PIN_NOPULL);
@@ -91,11 +91,14 @@ void GsmGpsInit()
 
     nrf_gpio_cfg_input(GSM_RING_INT_PIN, NRF_GPIO_PIN_PULLUP);
 
-    GsmBatteryOn();
-
     UartConfig(UART_BAUDRATE_BAUDRATE_Baud115200,
                UART_CONFIG_PARITY_Excluded,
                UART_CONFIG_HWFC_Disabled);
+}
+
+void GsmGpsInit()
+{
+    GsmBatteryOn();
 
     UartEnable();
     UartRxStart();

@@ -27,6 +27,8 @@ extern uint32_t    deviceId;
 
 #define GSM_FIXED_BAUDRATE_SET      (uint32_t)(0xFFFFFFFE)
 
+void GsmGpsPinsInit();
+
 void GsmGpsInit();
 
 void GsmBatteryOn();

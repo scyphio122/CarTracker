@@ -13,6 +13,7 @@
 #include "gsm.h"
 #include "nrf_nvic.h"
 #include "nrf.h"
+#include "nfc.h"
 
 void GPIOTE_IRQHandler()
 {

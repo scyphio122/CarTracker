@@ -15,6 +15,7 @@
 #include "Systick.h"
 #include "fifo.h"
 #include "app_fifo.h"
+#include <string.h>
 
 static uint8_t _nfcWriteFifoBuffer[32];
 fifo_t nfcWriteFifo;
@@ -135,11 +136,20 @@ void NfcPowerOn()
 {
     nrf_gpio_pin_set(NFC_EN_PIN);
 
-    NfcLowPower();
+    NfcTxRxFullPower();
 
-    NfcEnableRxCrcCheck(true);
+
 
     NfcSetProtocol();
+
+    NfcSetModulatorFrequency();
+
+    NfcEnableRxCrcCheck(false);
+
+//    NfcDummyTestCode();
+    NfcSendCommand(NFC_RECEIVER_GAIN_ADJUST_COMMAND);
+
+    NfcEnableRxCrcCheck(true);
 }
 
 void NfcPowerOff()
@@ -201,15 +211,16 @@ void NfcTxRxFullPower()
 
 void NfcSetProtocol()
 {
-    uint8_t regValue = 0;
-    NfcReadRegister(NFC_ISO_CTRL_REGISTER_ADDRESS, &regValue);
-
-    regValue &= 0b11100000;
-    regValue |= NFC_ISO_14443_A_106_KBPS_PROTOCOL;
+    uint8_t regValue = NFC_ISO_14443_A_106_KBPS_PROTOCOL;
 
     NfcWriteRegister(NFC_ISO_CTRL_REGISTER_ADDRESS, regValue);
 
     NfcReadRegister(NFC_ISO_CTRL_REGISTER_ADDRESS, &regValue);
+}
+
+void NfcSetModulatorFrequency()
+{
+    NfcWriteRegister(NFC_ModulatorControl_REG_ADDRESS, 0x21);
 }
 
 void NfcEnableRxCrcCheck(bool enabled)
@@ -219,14 +230,19 @@ void NfcEnableRxCrcCheck(bool enabled)
 
     if (enabled)
     {
-        regValue |= NFC_ISO_ENABLE_RX_CRC;
+        regValue &= ~NFC_ISO_ENABLE_RX_CRC;
     }
     else
     {
-        regValue &= ~NFC_ISO_ENABLE_RX_CRC;
+        regValue |= NFC_ISO_ENABLE_RX_CRC;
     }
 
     NfcWriteRegister(NFC_ISO_CTRL_REGISTER_ADDRESS, regValue);
+}
+
+void NfcDummyTestCode()
+{
+    NfcWriteRegister(0x1A, 0x40);
 }
 
 void NfcResetFifo()
@@ -328,13 +344,13 @@ void NfcTransferData(uint8_t* data, uint8_t dataSize)
 {
     if (dataSize > sizeof(_nfcWriteFifoBuffer))
     {
-        while(1) __
+        while(1)
         {
-            WFE();
+            __WFE();
         }
     }
 
-    FifoClear(&fifo_t);
+    FifoClear(&nfcWriteFifo);
     memcpy(_nfcWriteFifoBuffer, data, dataSize);
     _txInProgress = true;
 

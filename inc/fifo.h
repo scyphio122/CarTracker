@@ -25,7 +25,7 @@ typedef struct
 uint32_t        FifoLeftSpace(fifo_t * p_fifo);
 void            FifoInit(fifo_t* fifo, void* buf, uint16_t buf_size, uint8_t word_size);
 void            FifoClear(fifo_t* fifo);
-inline int      FifoGet(fifo_t* fifo, void* data);
+int             FifoGet(fifo_t* fifo, void* data);
 uint32_t        FifoPeek(fifo_t* fifo, uint16_t index);
 void            FifoPut(fifo_t* fifo, uint32_t data);
 uint32_t        FifoIsEmpty(fifo_t* fifo);

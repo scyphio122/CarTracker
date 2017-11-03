@@ -38,6 +38,27 @@
 #define NFC_IRQ_RX_START                        (uint8_t)0x40
 #define NFC_IRQ_END_OF_TX                       (uint8_t)0x80
 
+#define NFC_ISO14443B_OPTIONS_REG_ADDRESS       0x02
+#define NFC_ISO14443A_OPTIONS_REG_ADDRESS       0x03
+#define NFC_TXtimerEPChigh_REG_ADDRESS          0x04
+#define NFC_TXtimerEPClow_REG_ADDRESS           0x05
+#define NFC_TXPulseLenghtControl_REG_ADDRESS    0x06
+#define NFC_RXNoResponseWaitTime_REG_ADDRESS    0x07
+#define NFC_RXWaitTime_REG_ADDRESS              0x08
+#define NFC_ModulatorControl_REG_ADDRESS        0x09
+#define NFC_RXSpecialSettings_REG_ADDRESS       0x0A
+#define NFC_IRQMask_REG_ADDRESS                 0x0D
+#define NFC_CollisionPosition_REG_ADDRESS       0x0E
+#define NFC_RSSILevels_REG_ADDRESS              0x0F
+#define NFC_RAMStartAddress_REG_ADDRESS         0x10    //RAM is 7 bytes long (0x10 - 0x16)
+#define NFC_NFCID_REG_ADDRESS                   0x17
+#define NFC_NFCTargetLevel_REG_ADDRESS          0x18
+#define NFC_NFCTargetProtocol_REG_ADDRESS       0x19
+#define NFC_TestSetting1_REG_ADDRESS            0x1A
+#define NFC_TestSetting2_REG_ADDRESS            0x1B
+#define NFC_TXLenghtByte1_REG_ADDRESS           0x1D
+#define NFC_TXLenghtByte2_REG_ADDRESS           0x1E
+
 // This is TX FIFO
 #define NFC_FIFO_ADDRESS                        (uint8_t)(0x1F)
 
@@ -107,6 +128,10 @@ void NfcTxRxHalfPower();
 void NfcTxRxFullPower();
 
 void NfcSetProtocol();
+
+void NfcSetModulatorFrequency();
+
+void NfcDummyTestCode();
 
 void NfcResetFifo();
 

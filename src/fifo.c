@@ -54,7 +54,7 @@ inline int FifoGet(fifo_t* fifo, void* data)
     // If fifo empty
     if (fifo->read_pos == fifo->write_pos)
     {
-        *data = 0;
+        *(uint8_t*)data = 0;
         return -1;
     }
     else

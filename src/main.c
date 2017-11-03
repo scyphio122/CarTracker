@@ -137,8 +137,11 @@ int main(void)
 	ExtFlashTurnOff();
 
     NfcInit();
+
     NfcPowerOn();
-    NfcTxRxHalfPower();
+    SystickDelayMs(100);
+//    NfcTxRxFullPower();
+    NfcRxOnly();
 
     while(1)
     {

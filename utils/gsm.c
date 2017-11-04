@@ -27,8 +27,9 @@
 #include "RTC.h"
 #include "parsing_utils.h"
 
-uint64_t    gsmDeviceNumber;
-uint64_t    gsmOwnerDeviceNumber = 48691494830;
+uint64_t        gsmDeviceNumber;
+uint64_t        gsmOwnerDeviceNumber = 48691494830;
+volatile bool   gsmGprsIsEnabled = false;
 
 uint32_t    deviceId = 2;
 uint32_t    trackId = 2;
@@ -456,9 +457,22 @@ static gsm_error_e _GsmSetUrl(uint8_t* relativeUrl)
     return err;
 }
 
-static void GsmGprsEnable()
+gsm_error_e GsmGprsEnable()
 {
+    gsmGprsIsEnabled = true;
+
     GsmUartSendCommand("AT+CGATT=1", sizeof("AT+CGATT=1"), NULL);
+    GsmUartSendCommand("AT+QIFGCNT=0", sizeof("AT+QIFGCNT=0"), NULL);
+    GsmUartSendCommand("AT+QICSGP=1,\"internet\"", sizeof("AT+QICSGP=1,\"internet\""), NULL);
+    GsmUartSendCommand("AT+QIREGAPP", sizeof("AT+QIREGAPP"), NULL);
+    return GsmUartSendCommand("AT+QIACT", sizeof("AT+QIACT"), NULL);
+}
+
+gsm_error_e GsmGprsDisable()
+{
+    gsmGprsIsEnabled = false;
+
+    return GsmUartSendCommand("AT+QIDEACT", sizeof("AT+QIDEACT"), NULL);
 }
 
 gsm_error_e GsmHttpSendGet(uint8_t* relativeUrl)
@@ -471,12 +485,10 @@ gsm_error_e GsmHttpSendGet(uint8_t* relativeUrl)
     memcpy(triggerGetQuery, AT_GSM_HTTP_GET, sizeof(AT_GSM_HTTP_GET));
     strcat(triggerGetQuery, GSM_HTTP_SERVER_RESPONSE_TIMEOUT_SEC);
 
-
-    GsmGprsEnable();
-    GsmUartSendCommand("AT+QIFGCNT=0", sizeof("AT+QIFGCNT=0"), NULL);
-    GsmUartSendCommand("AT+QICSGP=1,\"internet\"", sizeof("AT+QICSGP=1,\"internet\""), NULL);
-    GsmUartSendCommand("AT+QIREGAPP", sizeof("AT+QIREGAPP"), NULL);
-    GsmUartSendCommand("AT+QIACT", sizeof("AT+QIACT"), NULL);
+    if (!gsmGprsIsEnabled)
+    {
+        GsmGprsEnable();
+    }
 
     _GsmSetUrl(relativeUrl);
 
@@ -484,7 +496,6 @@ gsm_error_e GsmHttpSendGet(uint8_t* relativeUrl)
     if (err != GSM_OK)
         return err;
 
-//    err = GsmUartSendCommand("AT+QIDEACT", sizeof("AT+QIDEACT"), NULL);
 
 //    err = _GsmSwitchBackToAtMode();
     return err;
@@ -502,6 +513,11 @@ gsm_error_e GsmHttpSendPost(uint8_t* relativeUrl, uint8_t* data, uint32_t dataSi
     memset(triggerGetQuery, 0, sizeof(triggerGetQuery));
     memcpy(triggerGetQuery, AT_GSM_HTTP_POST, sizeof(AT_GSM_HTTP_POST));
     strcat(triggerGetQuery, postParams);
+
+    if (!gsmGprsIsEnabled)
+    {
+        GsmGprsEnable();
+    }
 
     _GsmSetUrl(relativeUrl);
 
@@ -549,6 +565,9 @@ gsm_error_e GsmHttpSendStartTrack()
 
     err = GsmHttpGetServerResponse(serverResponse);
 
+    if (err != GSM_OK)
+        return err;
+
     char* result = strstr(serverResponse, "\"result\":");
     if (result == NULL)
         return GSM_ERROR_HTTP_DAMAGED_RESPONSE;
@@ -564,6 +583,7 @@ gsm_error_e GsmHttpSendStartTrack()
     idTrackStartPtr += sizeof("\"idTrack\"");
     char*  idTrackEndPtr = strstr(idTrackStartPtr, ",");
 
+    // Parse the track id from the resver response
     trackId = _atoi(idTrackStartPtr, (idTrackEndPtr - idTrackStartPtr));
 
     return GSM_OK;
@@ -582,8 +602,8 @@ gsm_error_e GsmHttpEndTrack()
     GpsStringifyCoord(&gpsLastSample.latitude, latitude);
     GpsStringifyCoord(&gpsLastSample.longtitude, longtitude);
 
-    sprintf(url, "%s%s%d&%s%u&%s=%s;%s&%s%d",  "end_track/",
-                                    "idTracl=", trackId,
+    sprintf(url, "%s%s%d&%s%u&%s=%s;%s&%s%d",  "end_track?",
+                                    "idTrack=", trackId,
                                     "endDate=", RtcGetTimestamp(),
                                     "endLocation=", latitude, longtitude,
                                     "manouverAssessment=", trackAssessment);
@@ -601,7 +621,7 @@ gsm_error_e GsmHttpSendSample(gps_sample_t* sample)
     memset(latitude, 0, sizeof(latitude));
     memset(longtitude, 0, sizeof(longtitude));
 
-    sprintf(url, "%s%s%d&%s%u&%s=%s;%s&%s%d",  "add_track_sample/",
+    sprintf(url, "%s%s%d&%s%u&%s=%s;%s&%s%d",  "add_track_sample?",
                                     "idDevice=", deviceId,
                                     "endDate=", RtcGetTimestamp(),
                                     "endLocation=", latitude, longtitude,

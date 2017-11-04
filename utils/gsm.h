@@ -67,6 +67,10 @@ void GsmSmsDeleteAll();
 
 void GsmSynchronizeTime();
 
+gsm_error_e GsmGprsEnable();
+
+gsm_error_e GsmGprsDisable();
+
 gsm_error_e GsmHttpSendGet(uint8_t* relativeUrl);
 
 gsm_error_e GsmHttpSendPost(uint8_t* relativeUrl, uint8_t* data, uint32_t dataSize);

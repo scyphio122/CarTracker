@@ -152,7 +152,6 @@ RTC_Error_e RTCClearTimeout(NRF_RTC_Type* RTC, uint8_t timeoutId)
 	if (RTC == NRF_RTC1)
 	{
 		rtcTimeoutArray[timeoutId].activeFlag = false;
-		rtcTimeoutArray[timeoutId].timeoutTriggeredFlag = false;
 		RTCDisableComparingReg(RTC, (timeoutId + 1));
 	}
 

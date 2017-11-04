@@ -28,7 +28,10 @@
 
 uint64_t    gsmDeviceNumber;
 uint64_t    gsmOwnerDeviceNumber = 48691494830;
-uint32_t    deviceId = 0;
+
+uint32_t    deviceId = 2;
+uint32_t    trackId = 2;
+uint16_t    trackAssessment = 0;
 
 static void _GsmExecuteSmsTask(char* smsText)
 {
@@ -237,6 +240,60 @@ gsm_error_e GsmUartSendCommand(void* command, uint16_t commandSize, char* respon
     return GSM_ERROR;
 }
 
+gsm_error_e GsmUartSendCommandWithDifferentResponse(void* command, uint16_t commandSize, char* response, char* successResponse)
+{
+    static uint8_t cmd[32];
+    char* success = NULL;
+    char* error = NULL;
+    uint8_t timeoutId = 0;
+
+    memcpy(cmd, command, commandSize - 1);
+    cmd[commandSize - 1] = '\n';
+    FifoClear(&uartRxFifo);
+    memset(uartRxFifo.p_buf, 0, uartRxFifo.buf_size_mask);
+    UartEnable();
+    UartRxStart();
+
+    UartSendDataSync(cmd, commandSize);
+
+//    RTCTimeout(NRF_RTC1, RTC1_MS_TO_TICKS(1000), &timeoutId);
+    do
+    {
+        sd_app_evt_wait();
+        success = strstr(uartRxFifo.p_buf, successResponse);
+        error = strstr(uartRxFifo.p_buf, "ERROR");
+    }while(success == NULL && error == NULL && rtcTimeoutArray[timeoutId].timeoutTriggeredFlag == false);
+
+//    RTCClearTimeout(NRF_RTC1, timeoutId);
+
+    if (error != NULL)
+    {
+        SystickDelayMs(5000);
+    }
+
+    UartRxStop();
+    UartDisable();
+
+
+    if (response != NULL && success)
+    {
+        // Point to the '\r\n' before the OK response
+        success -= 2;
+        char* temp = uartRxFifo.p_buf;
+        while (temp != success)
+        {
+            *response = *temp;
+            response++;
+            temp++;
+        }
+    }
+
+    if (success)
+        return GSM_OK;
+
+    return GSM_ERROR;
+}
+
 void GsmBlockIncommingCalls()
 {
     GsmUartSendCommand(AT_GSM_SET_REFUSE_OPTS(GSM_RECEIVE_SMS, GSM_REFUSE_INCOMMING_CALL),
@@ -275,7 +332,7 @@ void GsmSmsReadAll()
         memset(smsText, 0, sizeof(smsText));
         sscanf(smsIndex, "%d", i);
         strcat(command, smsIndex);
-        err = GsmUartSendCommand(command, strlen(command), smsText);
+        err = GsmUartSendCommand(command, strlen(command) + 1, smsText);
 
         if (err == GSM_OK)
         {
@@ -315,7 +372,7 @@ void GsmSmsDelete(int smsIndex)
     sscanf(index, "%d", smsIndex);
     strcat(command, index);
 
-    GsmUartSendCommand(command, strlen(command), NULL);
+    GsmUartSendCommand(command, strlen(command) + 1, NULL);
 }
 
 void GsmSmsDeleteAll()
@@ -355,23 +412,164 @@ void GsmSynchronizeTime()
     RtcSetTimestamp(RtcConvertDateTimeToTimestamp(&time, &date));
 }
 
-gsm_error_e GsmHttpSendMessage(uint8_t* data, uint32_t dataSize)
+static gsm_error_e _GsmSwitchBackToAtMode()
 {
-    return GSM_OK;
+    gsm_error_e err = GSM_OK;
+    SystickDelayMs(500);
+    err = GsmUartSendCommand("+++", 3, NULL);
+    SystickDelayMs(500);
+
+    return err;
+}
+
+gsm_error_e GsmHttpSendGet(uint8_t* relativeUrl)
+{
+    gsm_error_e err = GSM_OK;
+    uint16_t fullUrlSize = sizeof(AT_GSM_HTTP_URL) + GSM_SECUCAR_SERVER_BASE_URL_SIZE + strlen(relativeUrl);
+    char* fullUrl = malloc(fullUrlSize);
+    char  triggerGetQuery[16];
+
+    memset(triggerGetQuery, 0, sizeof(triggerGetQuery));
+    memcpy(triggerGetQuery, AT_GSM_HTTP_GET, sizeof(AT_GSM_HTTP_GET));
+    strcat(triggerGetQuery, GSM_HTTP_SERVER_RESPONSE_TIMEOUT_SEC);
+
+    memset(fullUrl, 0, fullUrlSize);
+    memcpy(fullUrl, AT_GSM_HTTP_URL, sizeof(AT_GSM_HTTP_URL));
+    strcat(fullUrl, GSM_SECUCAR_SERVER_BASE_URL);
+    strcat(fullUrl, relativeUrl);
+
+    err = GsmUartSendCommandWithDifferentResponse(fullUrl, strlen(fullUrl) + 1, NULL, "CONNECT");
+
+    if (err != GSM_OK)
+        return err;
+
+    err = GsmUartSendCommand(triggerGetQuery, strlen(triggerGetQuery) + 1, NULL);
+    if (err != GSM_OK)
+        return err;
+
+    free(fullUrl);
+
+    err = _GsmSwitchBackToAtMode();
+    return err;
+}
+
+gsm_error_e GsmHttpSendPost(uint8_t* relativeUrl, uint8_t* data, uint32_t dataSize)
+{
+    gsm_error_e err = GSM_OK;
+    uint16_t fullUrlSize = sizeof(AT_GSM_HTTP_URL) + GSM_SECUCAR_SERVER_BASE_URL_SIZE + strlen(relativeUrl);
+    char* fullUrl = malloc(fullUrlSize);
+    char  triggerGetQuery[32];
+    char  postParams[16];
+
+    memset(postParams, 0, sizeof(postParams));
+    sprintf(postParams, "%u,%s,%s", dataSize, GSM_HTTP_POST_INPUT_FILL_TIMEOUT_SEC, GSM_HTTP_SERVER_RESPONSE_TIMEOUT_SEC);
+
+    memset(triggerGetQuery, 0, sizeof(triggerGetQuery));
+    memcpy(triggerGetQuery, AT_GSM_HTTP_POST, sizeof(AT_GSM_HTTP_POST));
+    strcat(triggerGetQuery, postParams);
+
+    memset(fullUrl, 0, fullUrlSize);
+    memcpy(fullUrl, AT_GSM_HTTP_URL, sizeof(AT_GSM_HTTP_URL));
+    strcat(fullUrl, GSM_SECUCAR_SERVER_BASE_URL);
+    strcat(fullUrl, relativeUrl);
+
+    err = GsmUartSendCommandWithDifferentResponse(fullUrl, strlen(fullUrl) + 1, NULL, "CONNECT");
+    if (err != GSM_OK)
+        return err;
+
+    err = GsmUartSendCommand(triggerGetQuery, strlen(triggerGetQuery) + 1, NULL);
+    if (err != GSM_OK)
+        return err;
+
+    free(fullUrl);
+
+    return _GsmSwitchBackToAtMode();
+}
+
+gsm_error_e GsmHttpGetServerResponse(uint8_t* buf)
+{
+    char cmd[16];
+    memset(cmd, 0, sizeof(cmd));
+
+    sprintf(cmd, "%s%d", AT_GSM_HTTP_READ_SERVER_RESPONSE, "2");
+
+    return GsmUartSendCommand(cmd, strlen(cmd) + 1, buf);
 }
 
 gsm_error_e GsmHttpSendStartTrack()
 {
+    char url[128];
+    char latitude[16];
+    char longtitude[16];
+    char serverResponse[128];
+    gsm_error_e err = GSM_OK;
+
+    memset(url, 0, sizeof(url));
+    memset(latitude, 0, sizeof(latitude));
+    memset(longtitude, 0, sizeof(longtitude));
+    memset(serverResponse, 0, sizeof(serverResponse));
+
+    GpsStringifyCoord(&gpsLastSample.latitude, latitude);
+    GpsStringifyCoord(&gpsLastSample.longtitude, longtitude);
+
+    sprintf(url, "%s%s%d&%s%u&%s%s;%s",  "add_track/",
+                                    "idDevice=", deviceId,
+                                    "startDate=", RtcGetTimestamp(),
+                                    "startLocation=", latitude, longtitude);
+    err = GsmHttpSendGet(url);
+
+    err = GsmHttpGetServerResponse(serverResponse);
+
+    char* result = strstr(serverResponse, "result=");
+    result += sizeof("result");
+
+    if (*result == '0' || *result == 0)
+    {
+        return GSM_ERROR_HTTP_SERVER_INTERNAL;
+    }
+
+    result = strstr(result, "idTrack");
+
     return GSM_OK;
 }
 
 gsm_error_e GsmHttpEndTrack()
 {
-    return GSM_OK;
+    char url[64];
+    char latitude[16];
+    char longtitude[16];
+
+    memset(url, 0, sizeof(url));
+    memset(latitude, 0, sizeof(latitude));
+    memset(longtitude, 0, sizeof(longtitude));
+
+    GpsStringifyCoord(&gpsLastSample.latitude, latitude);
+    GpsStringifyCoord(&gpsLastSample.longtitude, longtitude);
+
+    sprintf(url, "%s%s%d&%s%u&%s=%s;%s&%s%d",  "end_track/",
+                                    "idTracl=", trackId,
+                                    "endDate=", RtcGetTimestamp(),
+                                    "endLocation=", latitude, longtitude,
+                                    "manouverAssessment=", trackAssessment);
+
+    return GsmHttpSendGet(url);
 }
 
 gsm_error_e GsmHttpSendSample(gps_sample_t* sample)
 {
+    char url[64];
+    char latitude[16];
+    char longtitude[16];
 
-    return GSM_OK;
+    memset(url, 0, sizeof(url));
+    memset(latitude, 0, sizeof(latitude));
+    memset(longtitude, 0, sizeof(longtitude));
+
+    sprintf(url, "%s%s%d&%s%u&%s=%s;%s&%s%d",  "add_track_sample/",
+                                    "idDevice=", deviceId,
+                                    "endDate=", RtcGetTimestamp(),
+                                    "endLocation=", latitude, longtitude,
+                                    "manouverAssessment=", trackAssessment);
+
+    return GsmHttpSendGet(url);
 }

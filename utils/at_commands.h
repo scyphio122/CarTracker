@@ -63,6 +63,12 @@
 #define AT_GSM_SEND_SMS_MESSAGE             "AT+CMGS="
 
 
+#define AT_GSM_HTTP_URL                     "AT+QHTTPURL="
+#define AT_GSM_HTTP_GET                     "AT+QHTTPGET="
+#define AT_GSM_HTTP_READ_SERVER_RESPONSE    "AT+QHTTPREAD"
+#define AT_GSM_HTTP_POST                    "AT+QHTTPPOST="
+
+
 /** -------------------------------------------------------- GPS COMMANDS ------------------------------------------------------------------ */
 
 #define AT_GPS_POWER_READ                   "AT+QGNSSC?"

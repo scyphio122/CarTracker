@@ -143,7 +143,12 @@ int main(void)
 //	uint32_t timestamp = RtcConvertDateTimeToTimestamp(&time, &date);
 //	IntFlashErasePage(PERSISTENT_CONFIG_PAGE_ADDRESS);
 	GsmGpsInit();
-    GpioteInit();
+	GsmHttpSendStartTrack();
+
+	while(1)
+	    __WFE();
+//    GpioteInit();
+
 
 
     if (!CryptoCheckMainKey())

@@ -102,6 +102,8 @@ void GpsEnableEPO();
 
 void GpsGetData();
 
+void GpsStringifyCoord(gps_coord_t* coord, char* buf);
+
 void GpsRequestMessage(gps_message_type_e msgType);
 
 gps_error_e GpsParseMessageGGA(uint8_t* msgBuffer, uint16_t msgBufferSize);

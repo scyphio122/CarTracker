@@ -12,13 +12,21 @@
 #include <stdbool.h>
 #include "gps.h"
 
-#define GSM_SMS_COMMAND_GET_LOCATION        "GET LOCATION"
-#define GSM_SMS_COMMAND_ABORT_ALARM         "ABORT ALARM"
+#define GSM_SECUCAR_SERVER_IP                   "89.77.116.157"
+#define GSM_SECUCAR_SERVER_PORT                 "8080"
+#define GSM_SECUCAR_SERVER_BASE_URL             "http://" GSM_SECUCAR_SERVER_IP ":" GSM_SECUCAR_SERVER_PORT "/"
+#define GSM_SECUCAR_SERVER_BASE_URL_SIZE        sizeof(GSM_SECUCAR_SERVER_BASE_URL)
+#define GSM_HTTP_SERVER_RESPONSE_TIMEOUT_SEC    "5"
+#define GSM_HTTP_POST_INPUT_FILL_TIMEOUT_SEC    "2"
+
+#define GSM_SMS_COMMAND_GET_LOCATION            "GET LOCATION"
+#define GSM_SMS_COMMAND_ABORT_ALARM             "ABORT ALARM"
 
 typedef enum
 {
     GSM_OK,
-    GSM_ERROR
+    GSM_ERROR,
+    GSM_ERROR_HTTP_SERVER_INTERNAL
 }gsm_error_e;
 
 extern uint64_t    gsmDeviceNumber;
@@ -39,6 +47,8 @@ void GsmPowerOff();
 
 gsm_error_e GsmUartSendCommand(void* command, uint16_t commandSize, char* response);
 
+gsm_error_e GsmUartSendCommandWithDifferentResponse(void* command, uint16_t commandSize, char* response, char* successResponse);
+
 void GsmBlockIncommingCalls();
 
 void GsmSmsInit();
@@ -53,7 +63,11 @@ void GsmSmsDeleteAll();
 
 void GsmSynchronizeTime();
 
-gsm_error_e GsmHttpSendMessage(uint8_t* data, uint32_t dataSize);
+gsm_error_e GsmHttpSendGet(uint8_t* relativeUrl);
+
+gsm_error_e GsmHttpSendPost(uint8_t* relativeUrl, uint8_t* data, uint32_t dataSize);
+
+gsm_error_e GsmHttpGetServerResponse(uint8_t* buf);
 
 gsm_error_e GsmHttpSendStartTrack();
 

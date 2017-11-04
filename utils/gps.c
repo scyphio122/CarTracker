@@ -56,6 +56,12 @@ static void GpsParseLongtitude(char* coordinate, gps_coord_t* outCoord)
     outCoord->seconds = _atoi(coordinate + 6, 4);
 }
 
+void GpsStringifyCoord(gps_coord_t* coord, char* buf)
+{
+    //                     ddd*mm.mmmmN\0
+    sprintf(buf, "%d*%d.%d%c", coord->degrees, coord->minutes, coord->seconds, coord->hemisphereDescriptor);
+}
+
 void GpsPowerOn()
 {
     gsm_error_e err = GSM_OK;

@@ -96,7 +96,8 @@ void InitDeviceData()
 {
     memcpy(&gsmDeviceNumber     , (uint32_t*)GSM_DEVICE_PHONE_NUMBER_ADDRESS   , sizeof(uint64_t));
     memcpy(&gsmOwnerDeviceNumber, (uint32_t*)GSM_OWNER_PHONE_NUMBER_ADDRESS    , sizeof(uint64_t));
-    memcpy(&deviceId            , (uint32_t*)DEVICE_ID                         , sizeof(uint32_t));
+//    memcpy(&deviceId            , (uint32_t*)DEVICE_ID                         , sizeof(uint32_t));
+    deviceId = 2;
     memcpy(mainEncryptionKey    , (uint32_t*)CRYPTO_MAIN_KEY_ADDRESS           , CRYPTO_KEY_SIZE);
 
 //    Mem_Org_Init();
@@ -105,7 +106,7 @@ void InitDeviceData()
 __attribute__((optimize("O0")))
 int main(void)
 {
-    NRF_CLOCK->TRACECONFIG = 0;
+NRF_CLOCK->TRACECONFIG = 0;
 
 #if SOFTDEVICE_ENABLED
 	BleStackInit();
@@ -144,19 +145,20 @@ int main(void)
 //	IntFlashErasePage(PERSISTENT_CONFIG_PAGE_ADDRESS);
 	GsmGpsInit();
 	GsmHttpSendStartTrack();
-
+	GsmHttpSendSample(&gpsLastSample);
+	GsmHttpEndTrack();
 	while(1)
 	    __WFE();
-//    GpioteInit();
+    GpioteInit();
 
 
-
-    if (!CryptoCheckMainKey())
-    {
-        CryptoGenerateAndStoreMainKey();
-    }
 //
-	GpsPowerOn();
+//    if (!CryptoCheckMainKey())
+//    {
+//        CryptoGenerateAndStoreMainKey();
+//    }
+////
+//	GpsPowerOn();
 
 //	do
 //	{

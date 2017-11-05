@@ -591,7 +591,7 @@ gsm_error_e GsmHttpSendStartTrack()
 
 gsm_error_e GsmHttpEndTrack()
 {
-    char url[64];
+    char url[256];
     char latitude[16];
     char longtitude[16];
 
@@ -602,18 +602,18 @@ gsm_error_e GsmHttpEndTrack()
     GpsStringifyCoord(&gpsLastSample.latitude, latitude);
     GpsStringifyCoord(&gpsLastSample.longtitude, longtitude);
 
-    sprintf(url, "%s%s%d&%s%u&%s=%s;%s&%s%d",  "end_track?",
-                                    "idTrack=", trackId,
-                                    "endDate=", RtcGetTimestamp(),
-                                    "endLocation=", latitude, longtitude,
-                                    "manouverAssessment=", trackAssessment);
+    sprintf(url, "%s?%s=%d&%s=%u&%s=%s;%s&%s=%d",  "end_track",
+                                    "idTrack", trackId,
+                                    "endDate", RtcGetTimestamp(),
+                                    "endLocation", latitude, longtitude,
+                                    "manouverAssessment", trackAssessment);
 
     return GsmHttpSendGet(url);
 }
 
 gsm_error_e GsmHttpSendSample(gps_sample_t* sample)
 {
-    char url[64];
+    char url[256];
     char latitude[16];
     char longtitude[16];
 
@@ -621,11 +621,17 @@ gsm_error_e GsmHttpSendSample(gps_sample_t* sample)
     memset(latitude, 0, sizeof(latitude));
     memset(longtitude, 0, sizeof(longtitude));
 
-    sprintf(url, "%s%s%d&%s%u&%s=%s;%s&%s%d",  "add_track_sample?",
-                                    "idDevice=", deviceId,
-                                    "endDate=", RtcGetTimestamp(),
-                                    "endLocation=", latitude, longtitude,
-                                    "manouverAssessment=", trackAssessment);
+    GpsStringifyCoord(&(sample->latitude), latitude);
+    GpsStringifyCoord(&(sample->longtitude), longtitude);
+
+    sprintf(url, "%s?%s=%d&%s=%u&%s=%s;%s&%s=%d&%s=%d&%s=%d",
+                                    "add_track_sample",
+                                    "idTrack", trackId,
+                                    "timestamp", RtcGetTimestamp(),
+                                    "coordinates", latitude, longtitude,
+                                    "speed", gpsLastSample.speed,
+                                    "acceleration", gpsLastSample.acceleration,
+                                    "azimuth", gpsLastSample.azimuth);
 
     return GsmHttpSendGet(url);
 }

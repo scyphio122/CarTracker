@@ -96,9 +96,7 @@ void GpsPowerOn();
 
 void GpsPowerOff();
 
-void GpsDisableEPO();
-
-void GpsEnableEPO();
+void GpsAgpsTrigger();
 
 void GpsGetData();
 

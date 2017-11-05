@@ -96,6 +96,8 @@ void GsmGpsInit()
 
     nrf_gpio_cfg_input(GSM_RING_INT_PIN, NRF_GPIO_PIN_PULLUP);
 
+    nrf_gpio_cfg_input(GPS_ENABLE_PIN, NRF_GPIO_PIN_NOPULL);
+
     GsmBatteryOn();
 
     UartConfig(UART_BAUDRATE_BAUDRATE_Baud115200,
@@ -145,6 +147,8 @@ void GsmGpsInit()
             uint32_t t = GSM_FIXED_BAUDRATE_SET;
             IntFlashUpdatePage((uint8_t*)(&t), sizeof(t), (uint32_t*)GSM_BAUDRATE_CONFIG_ADDRESS);
         }
+
+        GsmUartSendCommand("AT+CTZU=3", sizeof("AT+CTZU=3"), NULL);
     }
     else
     {

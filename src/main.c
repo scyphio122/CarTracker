@@ -126,8 +126,8 @@ NRF_CLOCK->TRACECONFIG = 0;
 //	AdvertisingStart();
 //    BleCentralScanStart();
 #endif
-//	nrf_gpio_cfg_output(DEBUG_1_PIN_PIN);
-//	nrf_gpio_pin_clear(DEBUG_1_PIN_PIN);
+	nrf_gpio_cfg_output(DEBUG_1_PIN_PIN);
+	nrf_gpio_pin_set(DEBUG_1_PIN_PIN);
 //
 	nrf_gpio_cfg_output(DEBUG_2_PIN_PIN);
 	nrf_gpio_pin_clear(DEBUG_2_PIN_PIN);
@@ -142,11 +142,39 @@ NRF_CLOCK->TRACECONFIG = 0;
 //	date.month = 10;
 //	date.year = 2017;
 //	uint32_t timestamp = RtcConvertDateTimeToTimestamp(&time, &date);
-//	IntFlashErasePage(PERSISTENT_CONFIG_PAGE_ADDRESS);
+//	IntFlashErasePage((uint32_t*)PERSISTENT_CONFIG_PAGE_ADDRESS);
 	GsmGpsInit();
-	GsmHttpSendStartTrack();
-	GsmHttpSendSample(&gpsLastSample);
-	GsmHttpEndTrack();
+
+	gps_coord_t lat;
+	gps_coord_t lon;
+
+	lat.degrees = 52;
+	lat.minutes = 10;
+	lat.seconds = 8058;
+
+	lon.degrees = 21;
+	lon.minutes = 3;
+	lon.seconds = 4160;
+
+    GpsPowerOn();
+
+	GpsSetReferencePosition(&lat, &lon);
+	GpsAgpsTrigger();
+
+      do
+      {
+//          GpsGetData();
+          GpsRequestMessage(GPS_MSG_GGA);
+          if (gpsLastSample.fixStatus != GPS_FIX_NO_FIX && gpsLastSample.fixStatus != 0)
+          {
+              nrf_gpio_pin_clear(DEBUG_1_PIN_PIN);
+              nrf_gpio_pin_set(DEBUG_2_PIN_PIN);
+              break;
+          }
+
+          SystickDelayMs(60000);
+      }while (1);
+
 	while(1)
 	    __WFE();
     GpioteInit();
@@ -158,13 +186,7 @@ NRF_CLOCK->TRACECONFIG = 0;
 //        CryptoGenerateAndStoreMainKey();
 //    }
 ////
-//	GpsPowerOn();
 
-//	do
-//	{
-// 	    GpsGetData();
-//	    SystickDelayMs(5000);
-//	}while (1);
 
 //	NfcInit();
 //

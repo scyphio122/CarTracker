@@ -67,7 +67,7 @@ void GpsPowerOn()
 {
     gsm_error_e err = GSM_OK;
     GsmUartSendCommand(AT_GPS_POWER_ON, sizeof(AT_GPS_POWER_ON), NULL);
-    SystickDelayMs(2);
+    SystickDelayMs(10);
 }
 
 void GpsPowerOff()
@@ -122,7 +122,23 @@ void GpsAgpsTrigger()
     GpsTriggerEPO();
 }
 
-//void GpsSetReferencePosition()
+void GpsSetReferencePosition(gps_coord_t* latitude, gps_coord_t* longitude)
+{
+    char _latitude[16];
+    char _longtitude[16];
+    char cmd[64];
+
+    memset(_latitude, 0, sizeof(_latitude));
+    memset(_longtitude, 0, sizeof(_longtitude));
+    memset(cmd, 0 , sizeof(cmd));
+
+    sprintf(_latitude, "%d.%d%d", latitude->degrees, latitude->minutes, latitude->seconds);
+    sprintf(_longtitude, "%d.%d%d", longitude->degrees, longitude->minutes, longitude->seconds);
+
+    sprintf(cmd, "%s=%s,%s", AT_GPS_SET_REF_LOCATION, _latitude, _longtitude);
+
+    GsmUartSendCommand(cmd, strlen(cmd) + 1, NULL);
+}
 
 void GpsGetData()
 {

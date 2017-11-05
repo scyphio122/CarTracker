@@ -92,6 +92,6 @@
 #define AT_GPS_GET_TIME_SYNC_STATUS         "AT+QGNSSTS?"
 
 /** Set reference localization (last known localization) to decrease TTFF **/
-#define AT_GPS_SET_REF_LOCATION(lat, lng)   "AT+QGREFLOC=" lat "," lng
+#define AT_GPS_SET_REF_LOCATION             "AT+QGREFLOC"
 
 #endif /* UTILS_AT_COMMANDS_H_ */

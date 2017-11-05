@@ -96,6 +96,8 @@ void GpsPowerOn();
 
 void GpsPowerOff();
 
+void GpsSetReferencePosition(gps_coord_t* latitude, gps_coord_t* longitude);
+
 void GpsAgpsTrigger();
 
 void GpsGetData();

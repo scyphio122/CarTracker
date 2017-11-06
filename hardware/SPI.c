@@ -71,10 +71,11 @@ void SPIM0_SPIS0_TWIM0_TWIS0_SPI0_TWI0_IRQHandler()
 	}
 	else
 	{
+        dummy = NRF_SPI0->RXD;
+        s_spi0_bytes_sent++;
 		if (s_spi0_bytes_sent < s_spi0_bytes_to_send)
 		{
-			dummy = NRF_SPI0->RXD;
-			NRF_SPI0->TXD = s_spi0_write_buffer[s_spi0_bytes_sent++];
+			NRF_SPI0->TXD = s_spi0_write_buffer[s_spi0_bytes_sent];
 		}
 	}
 }
@@ -100,10 +101,11 @@ void SPIM1_SPIS1_TWIM1_TWIS1_SPI1_TWI1_IRQHandler()
 	}
 	else
 	{
+        dummy = NRF_SPI1->RXD;
+        s_spi1_bytes_sent++;
 		if (s_spi1_bytes_sent < s_spi1_bytes_to_send)
 		{
-			dummy = NRF_SPI1->RXD;
-			NRF_SPI1->TXD = s_spi1_write_buffer[s_spi1_bytes_sent++];
+			NRF_SPI1->TXD = s_spi1_write_buffer[s_spi1_bytes_sent];
 		}
 	}
 }
@@ -129,10 +131,11 @@ void SPIM2_SPIS2_SPI2_IRQHandler()
 	}
 	else
 	{
+        dummy = NRF_SPI2->RXD;
+        ++s_spi2_bytes_sent;
 		if (s_spi2_bytes_sent < s_spi2_bytes_to_send)
 		{
-			dummy = NRF_SPI2->RXD;
-			NRF_SPI2->TXD = s_spi2_write_buffer[s_spi2_bytes_sent++];
+			NRF_SPI2->TXD = s_spi2_write_buffer[s_spi2_bytes_sent];
 		}
 	}
 }
@@ -216,6 +219,8 @@ void SpiConfig(NRF_SPI_Type* spi,
 		}break;
 	}
 
+	nrf_gpio_pin_set(csPin);
+
 	spi->INTENSET = SPI_INTENSET_READY_Msk;
 	spi->FREQUENCY = frequency;
 	spi->CONFIG = (bytes_order << SPI_CONFIG_ORDER_Pos) | (sck_phase << SPI_CONFIG_CPHA_Pos) | (sck_polarity << SPI_CONFIG_CPOL_Pos);
@@ -245,9 +250,9 @@ E_SPI_Errors SpiWrite(NRF_SPI_Type* spi, uint8_t* in_buf, uint16_t data_size)
 			s_spi0_is_reading = false;
 
 			NRF_SPI0->INTENSET = SPI_INTENSET_READY_Msk;
-			spi->TXD = in_buf[s_spi0_bytes_sent++];
+			spi->TXD = in_buf[s_spi0_bytes_sent];
 			if (data_size > 1)	// Write second byte due to double buffering of SPI TXD register
-				spi->TXD = in_buf[s_spi0_bytes_sent++];
+				spi->TXD = in_buf[++s_spi0_bytes_sent];
 
 			while (s_spi0_bytes_sent < s_spi0_bytes_to_send)
 			{
@@ -268,9 +273,9 @@ E_SPI_Errors SpiWrite(NRF_SPI_Type* spi, uint8_t* in_buf, uint16_t data_size)
 			s_spi1_is_reading = false;
 
 			NRF_SPI1->INTENSET = SPI_INTENSET_READY_Msk;
-			spi->TXD = in_buf[s_spi1_bytes_sent++];
+			spi->TXD = in_buf[s_spi1_bytes_sent];
 			if (data_size > 1)	// Write second byte due to double buffering of SPI TXD register
-				spi->TXD = in_buf[s_spi1_bytes_sent++];
+				spi->TXD = in_buf[++s_spi1_bytes_sent];
 
 
 			while (s_spi1_bytes_sent < s_spi1_bytes_to_send)
@@ -292,9 +297,9 @@ E_SPI_Errors SpiWrite(NRF_SPI_Type* spi, uint8_t* in_buf, uint16_t data_size)
 			s_spi2_is_reading = false;
 
 			NRF_SPI2->INTENSET = SPI_INTENSET_READY_Msk;
-			spi->TXD = in_buf[s_spi2_bytes_sent++];
+			spi->TXD = in_buf[s_spi2_bytes_sent];
 			if (data_size > 1)	// Write second byte due to double buffering of SPI TXD register
-				spi->TXD = in_buf[s_spi2_bytes_sent++];
+				spi->TXD = in_buf[++s_spi2_bytes_sent];
 
 			while (s_spi2_bytes_sent < s_spi2_bytes_to_send)
 			{

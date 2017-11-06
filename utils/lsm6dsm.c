@@ -84,14 +84,151 @@ void AccSetFifoModeAndOutputRate()
     AccWriteRegister(FIFO_CTRL5_REG, &ctrl, sizeof(ctrl));
 }
 
-void AccInitSoftware()
+void AccelerometerWakeUp()
 {
-    uint8_t data = 0x60;
+    uint8_t data = 0;
+
+    AccReadRegister(CTRL1_XL_REG, &data, 1);
+    data |= ACC_GYR_ODR_12_5Hz;
+    AccWriteRegister(CTRL1_XL_REG, &data, 1);
+}
+
+void AccelerometerPowerDown()
+{
+    uint8_t data = 0;
+    AccReadRegister(CTRL1_XL_REG, &data, 1);
+    data |= ACC_ODR_POWER_DOWN;
+    AccWriteRegister(CTRL1_XL_REG, &data, 1);
+}
+
+void GyroWakeUp()
+{
+    uint8_t data = 0;
+    AccReadRegister(CTRL2_G_REG, &data, 1);
+    data |= ACC_GYR_ODR_12_5Hz;
+    AccWriteRegister(CTRL2_G_REG, &data, 1);
+}
+
+void GyroPowerDown()
+{
+    uint8_t data = 0;
+    AccReadRegister(CTRL2_G_REG, &data, 1);
+    data |= ACC_ODR_POWER_DOWN;
+    AccWriteRegister(CTRL2_G_REG, &data, 1);
+}
+
+void AccelerometerSetLowPower()
+{
+    uint8_t data = 0;
+
+    AccReadRegister(CTRL6_C_REG, &data, 1);
+
+    data |= 0x10;
+
+    AccWriteRegister(CTRL6_C_REG, &data, 1);
+}
+
+void AccelerometerSetHighPerformance()
+{
+    uint8_t data = 0;
+
+    AccReadRegister(CTRL6_C_REG, &data, 1);
+
+    data &= ~(0x10);
+
+    AccWriteRegister(CTRL6_C_REG, &data, 1);
+}
+
+void AccelerometerSetFiltering()
+{
+    uint8_t data;
+
+    AccReadRegister(CTRL1_XL_REG, &data, 1);
+
+    data |= 0x02;
 
     AccWriteRegister(CTRL1_XL_REG, &data, 1);
+}
 
-    data = 0x01;
+void GyroSetLowPower()
+{
+    uint8_t data = 0x00;
+    AccReadRegister(CTRL7_G_REG, &data, 1);
+
+    data |= 0x80;
+
+    AccWriteRegister(CTRL7_G_REG, &data, 1);
+}
+
+void GyroSetHighPerformance()
+{
+    uint8_t data = 0x80;
+    AccReadRegister(CTRL7_G_REG, &data, 1);
+
+    data &= ~(0x80);
+
+    AccWriteRegister(CTRL7_G_REG, &data, 1);
+}
+
+uint8_t ImuReadStatusReg()
+{
+    uint8_t statusReg = 0;
+
+    AccReadRegister(STATUS_REG, &statusReg, 1);
+
+    return statusReg;
+}
+
+/**
+ * @brief This function enables the BDU function. The Accelerometer does not refresh the sample in Gyro, Acc or temperature
+ * until BOTH of the MSB and LSB in the pair (REG_H and REG_L) are read
+ */
+static void ImuEnableDataRefreshBlockTillPairRead()
+{
+    uint8_t data = 0;
+    AccReadRegister(CTRL3_C_REG, &data, 1);
+
+    data |= 0x40;
+
+    AccWriteRegister(CTRL3_C_REG, &data, 1);
+}
+
+void ImuEnableDataReadyHardwareIRQ()
+{
+    // Enable ACC DRDY signal on INT1
+    uint8_t data = 0;
+    AccReadRegister(INT1_CTRL_REG, &data, 1);
+    data |= INT_DRDY_ACC_EN;
     AccWriteRegister(INT1_CTRL_REG, &data, 1);
+
+    // Enable GYRO DRDY signal on INT1
+    data = 0;
+    AccReadRegister(INT2_CTRL_REG, &data, 1);
+    data |= INT_DRDY_GYRO_EN;
+    AccWriteRegister(INT2_CTRL_REG, &data, 1);
+
+    // Set the interupt signal as a pulse rather than continuous high level
+    data = 0x80;
+    AccWriteRegister(DRDY_PULSE_CFG, &data, 1);
+
+    AccReadRegister(CTRL4_C_REG, &data, 1);
+    data |= 0x0C;       //< Disable I2C and enable DRDY signal masking during setup of filters
+    AccWriteRegister(CTRL4_C_REG, &data, 1);
+}
+
+void ImuInitSoftware()
+{
+    AccelerometerSetLowPower();
+    GyroSetLowPower();
+
+    AccelerometerWakeUp();
+    GyroPowerDown()();
+
+    AccelerometerSetFiltering();
+
+    ImuEnableDataReadyHardwareIRQ();
+
+    ImuEnableDataRefreshBlockTillPairRead();
 }
 
 

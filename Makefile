@@ -55,6 +55,7 @@ C_SOURCE_FILES += utils/external_flash_driver.c
 C_SOURCE_FILES += utils/file_system.c
 C_SOURCE_FILES += utils/gps.c
 C_SOURCE_FILES += utils/gsm.c
+C_SOURCE_FILES += utils/lsm6dsm.c
 C_SOURCE_FILES += utils/parsing_utils.c
 C_SOURCE_FILES += utils/scheduler.c
 #C_SOURCE_FILES += utils/nfc.c
@@ -217,3 +218,5 @@ $(BUILD_FOLDER):
 program_softdevice:
 	nrfjprog -e
 	nrfjprog --program $(S132_HEX)
+	# Disable NFC pins for MAIN BOARD
+	nrfjprog --memwr 0x1000120C --val 0xFFFFFFFE 	

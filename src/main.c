@@ -40,6 +40,7 @@
 #include "fifo.h"
 #include "request_fifos.h"
 #include "file_system.h"
+#include "lsm6dsm.h"
 //#include "nfc.h"
 /*
  *
@@ -132,6 +133,20 @@ NRF_CLOCK->TRACECONFIG = 0;
 	nrf_gpio_cfg_output(DEBUG_2_PIN_PIN);
 	nrf_gpio_pin_clear(DEBUG_2_PIN_PIN);
 
+	uint8_t data = 0x44;
+	AccelerometerInit();
+	AccTurnOn();
+	AccInitSoftware();
+//	AccWriteRegister(FIFO_CTRL1_REG, &data, 1);
+	do
+	{
+	    AccReadRegister(WHO_AM_I_REG, (uint8_t*)&data, 1);
+	    SystickDelayMs(10);
+	} while (1);
+
+    while(1)
+        __WFE();
+
 //	rtc_time_t time;
 //	rtc_date_t date;
 //	time.hour = 21;
@@ -175,8 +190,7 @@ NRF_CLOCK->TRACECONFIG = 0;
           SystickDelayMs(60000);
       }while (1);
 
-	while(1)
-	    __WFE();
+
     GpioteInit();
 
 

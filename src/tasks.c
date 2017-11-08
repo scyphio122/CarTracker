@@ -16,6 +16,7 @@
 #include "parsing_utils.h"
 #include "file_system.h"
 #include "ble_central.h"
+#include "lsm6dsm.h"
 
 volatile bool       isTrackInProgress = false;
 volatile bool       isAlarmActivated = true;
@@ -95,6 +96,7 @@ void TaskStartNewTrack()
 {
     if (!isTrackInProgress)
     {
+        ImuDisableWakeUpIRQ();
         TaskScanForKeyTag();
         Mem_Org_Track_Start_Storage();
         SchedulerAddOperation(TaskAlarmTimeout, alarmTimeoutMs, &alarmTimeoutTaskId, false);
@@ -109,6 +111,7 @@ void TaskEndCurrentTrack()
     Mem_Org_Track_Stop_Storage();
     SchedulerCancelOperation(&gpsSamplingTaskId);
     GsmHttpEndTrack();
+    ImuEnableWakeUpIRQ();
     isTrackInProgress = false;
 }
 

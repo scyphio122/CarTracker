@@ -9,9 +9,10 @@
 #define UTILS_LSM6DSM_H_
 
 #include <stdint-gcc.h>
+#include <stdbool.h>
 
-
-#define ACCELEROMETER_THRESHOLD     INT16_MAX/10    //< About 1.962m/s^2
+#define IMU_SAMPLE_BUFFER_SIZE      256
+#define WAKEUP_ACC_THRESHOLD        5    //< About 1.5m/s^2 (Calculation: WAKEUP_ACC_THRESHOLD*19.62/64)
 
 #define FUNC_CFG_ACCESS_REG  0x01
 
@@ -42,7 +43,6 @@
 #define CTRL9_XL_REG         0x18
 #define CTRL10_C_REG         0x19
 
-#define WAKE_UP_SRC_REG      0x1B
 #define TAP_SRC_REG          0x1C
 
 #define STATUS_REG           0x1E
@@ -72,6 +72,17 @@
 #define FIFO_DATA_OUT_L     0x3E
 #define FIFO_DATA_OUT_H     0x3F
 
+#define TAP_CFG_REG         0x58
+#define WAKE_UP_SRC_REG     0x1B
+#define WAKE_UP_THRESH_REG  0x5B
+#define WAKE_UP_DUR_REG     0x5C
+#define MD1_CFG_REG         0x5E
+#define MD2_CFG_REG         0x5F
+
+#define MD_CFG_WAKEUP_IRQ_EN    0x20
+
+#define TAP_CFG_FUNC_IRQ_EN         0x80
+#define TAP_CFG_FUNC_IRQ_LATCH      0x01
 
 #define ACC_ODR_POWER_DOWN  0x00
 #define ACC_ODR_1_6Hz       0xB0
@@ -86,28 +97,48 @@
 #define ACC_GYR_ODR_3333Hz  0x90
 #define ACC_GYR_ODR_6666Hz  0xA0
 
-void AccelerometerInit();
 
-void AccTurnOn();
-
-void AccTurnOff();
-
-void AccWriteRegister(uint8_t address, uint8_t* data, uint16_t dataSize);
-
-void AccReadRegister(uint8_t address, uint8_t* data, uint16_t dataSize);
-
-void AccInitSoftware();
+#define CTRL1_LPF1_BW_SEL                       0x02
+#define CTRL3_BLOCK_DATA_UPDATE_SYNCHRONEOUS    0x40
+#define CTRL4_DEN_DRDY_INT1_ENABLE              0x08
+#define CTRL4_I2C_DISABLE                       0x04
+#define CTRL6_XL_HM_MODE_DISABLED               0x10
+#define CTRL7_GYRO_HIGH_PERFORMANCE_DISABLED    0x80
+#define DRDY_PULSE_CFG_PULSE_MODE               0x80
 
 
-void AccSetFifoIntThreshold();
+typedef struct
+{
+    int16_t gyro_x;
+    int16_t gyro_y;
+    int16_t gyro_z;
+    int16_t acc_x;
+    int16_t acc_y;
+    int16_t acc_z;
+}imu_sample_set_t;
 
-void AccSetFifoModeAndOutputRate();
 
-void AccelerometerWakeUp();
+void ImuInit();
+
+void ImuTurnOn();
+
+void ImuTurnOff();
+
+void ImuWriteRegister(uint8_t address, uint8_t* data, uint16_t dataSize);
+
+void ImuReadRegister(uint8_t address, uint8_t* data, uint16_t dataSize);
+
+void ImuInitSoftware();
+
+void ImuSetFifoIntThreshold();
+
+void ImuSetFifoModeAndOutputRate();
+
+void AccelerometerSetODR();
 
 void AccelerometerPowerDown();
 
-void GyroWakeUp();
+void GyroSetODR();
 
 void GyroPowerDown();
 
@@ -124,5 +155,26 @@ void AccelerometerSetFiltering();
 uint8_t ImuReadStatusReg();
 
 void ImuEnableDataReadyHardwareIRQ();
+
+void ImuGetIdleAcceleration();
+
+void ImuGetSample();
+
+int32_t ImuGetMeanResultantAccelerationValue();
+
+
+void ImuSetWakeUpPinInt2();
+
+void ImuEnableWakeUpIRQ();
+
+void ImuDisableWakeUpIRQ();
+
+bool ImuIsWakeUpIRQ();
+
+void ImuSetWakeUpIrqThreshold(uint8_t threshold);
+
+void ImuSetWakeUpIrqTriggerSamplesCount(uint8_t xlOdrCycles);
+
+void ImuConfigureWakeUpIRQ();
 
 #endif /* UTILS_LSM6DSM_H_ */

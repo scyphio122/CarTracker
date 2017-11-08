@@ -12,6 +12,9 @@
 #include "pinout.h"
 #include "gsm.h"
 #include "nrf_nvic.h"
+#include "lsm6dsm.h"
+#include "tasks.h"
+#include "nrf_gpio.h"
 
 void GPIOTE_IRQHandler()
 {
@@ -38,6 +41,12 @@ void GPIOTE_IRQHandler()
     if (NRF_GPIOTE->EVENTS_IN[3])
     {
         NRF_GPIOTE->EVENTS_IN[3] = 0;
+
+        if (ImuIsWakeUpIRQ())
+        {
+            nrf_gpio_pin_clear(DEBUG_2_PIN_PIN);
+            TaskStartNewTrack();
+        }
     }
 
     if (NRF_GPIOTE->EVENTS_PORT)

@@ -250,9 +250,9 @@ E_SPI_Errors SpiWrite(NRF_SPI_Type* spi, uint8_t* in_buf, uint16_t data_size)
 			s_spi0_is_reading = false;
 
 			NRF_SPI0->INTENSET = SPI_INTENSET_READY_Msk;
-			spi->TXD = in_buf[s_spi0_bytes_sent];
+			spi->TXD = in_buf[0];
 			if (data_size > 1)	// Write second byte due to double buffering of SPI TXD register
-				spi->TXD = in_buf[++s_spi0_bytes_sent];
+				spi->TXD = in_buf[1];
 
 			while (s_spi0_bytes_sent < s_spi0_bytes_to_send)
 			{
@@ -273,9 +273,9 @@ E_SPI_Errors SpiWrite(NRF_SPI_Type* spi, uint8_t* in_buf, uint16_t data_size)
 			s_spi1_is_reading = false;
 
 			NRF_SPI1->INTENSET = SPI_INTENSET_READY_Msk;
-			spi->TXD = in_buf[s_spi1_bytes_sent];
+			spi->TXD = in_buf[0];
 			if (data_size > 1)	// Write second byte due to double buffering of SPI TXD register
-				spi->TXD = in_buf[++s_spi1_bytes_sent];
+				spi->TXD = in_buf[1];
 
 
 			while (s_spi1_bytes_sent < s_spi1_bytes_to_send)
@@ -297,9 +297,9 @@ E_SPI_Errors SpiWrite(NRF_SPI_Type* spi, uint8_t* in_buf, uint16_t data_size)
 			s_spi2_is_reading = false;
 
 			NRF_SPI2->INTENSET = SPI_INTENSET_READY_Msk;
-			spi->TXD = in_buf[s_spi2_bytes_sent];
+			spi->TXD = in_buf[0];
 			if (data_size > 1)	// Write second byte due to double buffering of SPI TXD register
-				spi->TXD = in_buf[++s_spi2_bytes_sent];
+				spi->TXD = in_buf[1];
 
 			while (s_spi2_bytes_sent < s_spi2_bytes_to_send)
 			{
@@ -330,6 +330,11 @@ E_SPI_Errors SpiRead(NRF_SPI_Type* spi, uint8_t* out_buf, uint16_t data_size)
 
 			NRF_SPI0->INTENSET = SPI_INTENSET_READY_Msk;
 			NRF_SPI0->TXD = SPI_DUMMY_BYTE;
+			if (data_size > 1)
+			{
+			    spi->TXD = SPI_DUMMY_BYTE;
+			}
+
 			while (s_spi0_is_reading)
 			{
 #if SOFTDEVICE_ENABLED
@@ -349,6 +354,11 @@ E_SPI_Errors SpiRead(NRF_SPI_Type* spi, uint8_t* out_buf, uint16_t data_size)
 
 			NRF_SPI1->INTENSET = SPI_INTENSET_READY_Msk;
 			NRF_SPI1->TXD = SPI_DUMMY_BYTE;
+            if (data_size > 1)
+            {
+                spi->TXD = SPI_DUMMY_BYTE;
+            }
+
 			while (s_spi1_is_reading)
 			{
 #if SOFTDEVICE_ENABLED
@@ -368,6 +378,11 @@ E_SPI_Errors SpiRead(NRF_SPI_Type* spi, uint8_t* out_buf, uint16_t data_size)
 
 			NRF_SPI2->INTENSET = SPI_INTENSET_READY_Msk;
 			NRF_SPI2->TXD = SPI_DUMMY_BYTE;
+            if (data_size > 1)
+            {
+                spi->TXD = SPI_DUMMY_BYTE;
+            }
+
 			while (s_spi2_is_reading)
 			{
 #if SOFTDEVICE_ENABLED
@@ -379,6 +394,83 @@ E_SPI_Errors SpiRead(NRF_SPI_Type* spi, uint8_t* out_buf, uint16_t data_size)
 		}break;
 	}
 	return error;
+}
+
+E_SPI_Errors SpiSingleWriteContRead(NRF_SPI_Type* spi, uint8_t writeChar, uint8_t* out_buf, uint16_t data_size)
+{
+    E_SPI_Errors error = E_SPI_SUCCESS;
+    switch ((uint32_t)spi)
+    {
+        case (uint32_t)NRF_SPI0:
+        {
+            s_spi0_bytes_received = 0;
+            s_spi0_bytes_to_read = data_size;
+            s_spi0_is_reading = true;
+            s_spi0_read_buffer = out_buf;
+
+            NRF_SPI0->INTENSET = SPI_INTENSET_READY_Msk;
+            NRF_SPI0->TXD = writeChar;
+            if (data_size > 0)
+            {
+                NRF_SPI0->TXD = SPI_DUMMY_BYTE;
+            }
+            while (s_spi0_is_reading)
+            {
+#if SOFTDEVICE_ENABLED
+                sd_app_evt_wait();
+#else
+                __WFE();
+#endif
+            }
+        }break;
+
+        case (uint32_t)NRF_SPI1:
+        {
+            s_spi1_bytes_received = 0;
+            s_spi1_bytes_to_read = data_size;
+            s_spi1_is_reading = true;
+            s_spi1_read_buffer = out_buf;
+
+            NRF_SPI1->INTENSET = SPI_INTENSET_READY_Msk;
+            NRF_SPI1->TXD = writeChar;
+            if (data_size > 0)
+            {
+                NRF_SPI1->TXD = SPI_DUMMY_BYTE;
+            }
+            while (s_spi1_is_reading)
+            {
+#if SOFTDEVICE_ENABLED
+                sd_app_evt_wait();
+#else
+                __WFE();
+#endif
+            }
+        }break;
+
+        case (uint32_t)NRF_SPI2:
+        {
+            s_spi2_bytes_received = 0;
+            s_spi2_bytes_to_read = data_size;
+            s_spi2_is_reading = true;
+            s_spi2_read_buffer = out_buf;
+
+            NRF_SPI2->INTENSET = SPI_INTENSET_READY_Msk;
+            NRF_SPI2->TXD = writeChar;
+            if (data_size > 0)
+            {
+                NRF_SPI2->TXD = SPI_DUMMY_BYTE;
+            }
+            while (s_spi2_is_reading)
+            {
+#if SOFTDEVICE_ENABLED
+                sd_app_evt_wait();
+#else
+                __WFE();
+#endif
+            }
+        }break;
+    }
+    return error;
 }
 
 void SpiCSAssert(uint8_t cs_pin)

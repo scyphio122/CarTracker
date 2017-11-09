@@ -78,19 +78,6 @@ void ImuReadRegister(uint8_t address, uint8_t* data, uint16_t dataSize)
     SpiDisable(ACC_SPI_PERIPH);
 }
 
-void ImuSetFifoIntThreshold()
-{
-    uint16_t threshold = 0x0600;
-
-    ImuWriteRegister(FIFO_CTRL1_REG, (uint8_t*)&threshold, sizeof(threshold));
-}
-
-void ImuSetFifoModeAndOutputRate()
-{
-    uint8_t ctrl = (0b00010000) | (0b110);
-    ImuWriteRegister(FIFO_CTRL5_REG, &ctrl, sizeof(ctrl));
-}
-
 void AccelerometerSetODR()
 {
     uint8_t data = 0;
@@ -187,7 +174,7 @@ static void ImuEnableDataRefreshBlockTillPairRead()
     ImuWriteRegister(CTRL3_C_REG, &data, 1);
 }
 
-void ImuEnableDataReadyHardwareIRQ()
+void ImuEnableDataReadySignal()
 {
     // Enable ACC DRDY signal on INT1
     uint8_t data = 0;
@@ -299,6 +286,8 @@ void ImuSetWakeUpIrqTriggerSamplesCount(uint8_t xlOdrCycles)
     regValue &= ~(0x9F);
     regValue |= (xlOdrCycles << 5);
     ImuWriteRegister(WAKE_UP_DUR_REG, &regValue, sizeof(regValue));
+    regValue = 0;
+    ImuReadRegister(WAKE_UP_DUR_REG, &regValue, sizeof(regValue));
 }
 
 
@@ -353,6 +342,101 @@ static int32_t _CalculateMeanValue(void* vector, uint32_t vectorSize, uint8_t wo
 
     return result;
 }
+
+/* ####################################################################################################################################### */
+/*                                                          FIFO CONFIGURATION                                                             */
+
+//void ImuSetFifoIntThreshold()
+//{
+//    uint16_t threshold = 0x0600;
+//
+//    ImuWriteRegister(FIFO_CTRL1_REG, (uint8_t*)&threshold, sizeof(threshold));
+//}
+//
+//void ImuSetFifoDecimationODR(uint8_t decimationGyroAndFifo)
+//{
+//    uint8_t reg = 0;
+//    ImuReadRegister(FIFO_CTRL3_REG, &reg, sizeof(reg));
+//
+//    reg &= 0b11000000;
+//    reg |= decimationGyroAndFifo;
+//
+//    ImuWriteRegister(FIFO_CTRL3_REG, &reg, sizeof(reg));
+//}
+//
+//void ImuSetFifoODR(uint8_t odr)
+//{
+//    uint8_t reg = 0;
+//    ImuReadRegister(FIFO_CTRL5_REG, &reg, sizeof(reg));
+//
+//    reg &= 0b10000111;
+//    reg |= odr;
+//
+//    ImuWriteRegister(FIFO_CTRL5_REG, &reg, sizeof(reg));
+//}
+//
+//void ImuSetFifoMode(uint8_t mode)
+//{
+//    uint8_t reg = 0;
+//    ImuReadRegister(FIFO_CTRL5_REG, &reg, sizeof(reg));
+//
+//    reg &= 0b11111000;
+//    reg |= mode;
+//
+//    ImuWriteRegister(FIFO_CTRL5_REG, &reg, sizeof(reg));
+//}
+//
+///**
+// * @brief This function configures the internal IMU fifo in the FIFO mode (single buffer, not continuous)
+// */
+//void ImuFifoConfigure()
+//{
+//    ImuSetFifoMode(FIFO_MODE_BYPASS);
+//
+//    // Enable both GYRO and ACC data in the fifo with no decimation
+//    ImuSetFifoDecimationODR(FIFO_DECIMATION_NO_DECIMATION_GYRO |
+//                            FIFO_DECIMATION_NO_DECIMATION_ACC);
+//
+//    ImuSetFifoODR(FIFO_ODR_26Hz);
+//}
+//
+//
+//void ImuFifoFlush()
+//{
+//    // Set to Bypass mode
+//    _ImuSetFifoMode(FIFO_MODE_BYPASS);
+//    // Set to Fifo mode
+//    _ImuSetFifoMode(FIFO_MODE_FIFO);
+//}
+//
+//uint16_t ImuFifoGetSamplesCount()
+//{
+//    uint16_t samplesCount = 0;
+//    ImuReadRegister(FIFO_STATUS1, &samplesCount, sizeof(samplesCount));
+//
+//    return samplesCount;
+//}
+//
+//void ImuFifoReadSingleSample(imu_sample_set_t* sample)
+//{
+//    // Read the order Gx, Gy, Gz, Ax, Ay, Az
+//    for (uint8_t i=0; i< sizeof(imu_sample_set_t)/2; ++i)
+//    {
+//        ImuReadRegister(FIFO_DATA_OUT_L, sample + i*sizeof(uint16_t), sizeof(uint16_t));
+//    }
+//}
+//
+//void ImuFifoGetAllSamples(imu_sample_set_t* sampleArray, uint16_t sampleArraySize)
+//{
+//    uint16_t samplesCount = ImuFifoGetSamplesCount();
+//
+//    for(uint16_t i=0; i<samplesCount; ++i)
+//    {
+//        ImuFifoReadSingleSample(sampleArray + i);
+//    }
+//}
+
+/* ####################################################################################################################################### */
 
 int32_t ImuGetMeanResultantAccelerationValue()
 {

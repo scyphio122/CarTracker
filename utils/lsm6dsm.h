@@ -22,6 +22,42 @@
 #define FIFO_CTRL4_REG       0x09
 #define FIFO_CTRL5_REG       0x0A
 
+#define FIFO_MODE_BYPASS                0x00
+#define FIFO_MODE_FIFO                  0x01
+#define FIFO_MODE_CONTINUOUS_TO_FIFO    0x03
+#define FIFO_MODE_BYPASS_TO_CONTINUOUS  0x04
+#define FIFO_MODE_CONTINUOUS            0x06
+
+#define FIFO_DECIMATION_DISABLED_GYRO           0x00        //< no fifo samples at all
+#define FIFO_DECIMATION_NO_DECIMATION_GYRO      0x01
+#define FIFO_DECIMATION_2_GYRO                  0x02
+#define FIFO_DECIMATION_3_GYRO                  0x03
+#define FIFO_DECIMATION_4_GYRO                  0x04
+#define FIFO_DECIMATION_8_GYRO                  0x05
+#define FIFO_DECIMATION_16_GYRO                 0x06
+#define FIFO_DECIMATION_32_GYRO                 0x07
+
+#define FIFO_DECIMATION_DISABLED_ACC            (0x00 << 3) //< no fifo samples at all
+#define FIFO_DECIMATION_NO_DECIMATION_ACC       (0x01 << 3)
+#define FIFO_DECIMATION_2_ACC                   (0x02 << 3)
+#define FIFO_DECIMATION_3_ACC                   (0x03 << 3)
+#define FIFO_DECIMATION_4_ACC                   (0x04 << 3)
+#define FIFO_DECIMATION_8_ACC                   (0x05 << 3)
+#define FIFO_DECIMATION_16_ACC                  (0x06 << 3)
+#define FIFO_DECIMATION_32_ACC                  (0x07 << 3)
+
+#define FIFO_ODR_DISABLED   (0x00)
+#define FIFO_ODR_12_5Hz     (0x01 << 3)
+#define FIFO_ODR_26Hz       (0x02 << 3)
+#define FIFO_ODR_52Hz       (0x03 << 3)
+#define FIFO_ODR_104Hz      (0x04 << 3)
+#define FIFO_ODR_208Hz      (0x05 << 3)
+#define FIFO_ODR_416Hz      (0x06 << 3)
+#define FIFO_ODR_833Hz      (0x07 << 3)
+#define FIFO_ODR_1666Hz     (0x08 << 3)
+#define FIFO_ODR_3333Hz     (0x09 << 3)
+#define FIFO_ODR_6666Hz     (0x0A << 3)
+
 #define DRDY_PULSE_CFG      0x0B
 
 #define INT1_CTRL_REG        0x0D

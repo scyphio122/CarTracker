@@ -11,8 +11,15 @@
 #include <stdint-gcc.h>
 #include <stdbool.h>
 
+
+
+#define CTRL1_ACCELEROMETER_RANGE_2g      ((uint8_t)0x00 << 2)
+#define CTRL1_ACCELEROMETER_RANGE_4g      ((uint8_t)0x02 << 2)
+#define CTRL1_ACCELEROMETER_RANGE_8g      ((uint8_t)0x03 << 2)
+#define CTRL1_ACCELEROMETER_RANGE_16g     ((uint8_t)0x01 << 2)
+
 #define IMU_SAMPLE_BUFFER_SIZE      256
-#define WAKEUP_ACC_THRESHOLD        5    //< About 1.5m/s^2 (Calculation: WAKEUP_ACC_THRESHOLD*19.62/64)
+#define WAKEUP_ACC_THRESHOLD        2    //< About 1.5m/s^2 (Calculation: WAKEUP_ACC_THRESHOLD*19.62/64)
 
 #define FUNC_CFG_ACCESS_REG  0x01
 
@@ -37,26 +44,26 @@
 #define FIFO_DECIMATION_16_GYRO                 0x06
 #define FIFO_DECIMATION_32_GYRO                 0x07
 
-#define FIFO_DECIMATION_DISABLED_ACC            (0x00 << 3) //< no fifo samples at all
-#define FIFO_DECIMATION_NO_DECIMATION_ACC       (0x01 << 3)
-#define FIFO_DECIMATION_2_ACC                   (0x02 << 3)
-#define FIFO_DECIMATION_3_ACC                   (0x03 << 3)
-#define FIFO_DECIMATION_4_ACC                   (0x04 << 3)
-#define FIFO_DECIMATION_8_ACC                   (0x05 << 3)
-#define FIFO_DECIMATION_16_ACC                  (0x06 << 3)
-#define FIFO_DECIMATION_32_ACC                  (0x07 << 3)
+#define FIFO_DECIMATION_DISABLED_ACC            ((uint8_t)0x00 << 3) //< no fifo samples at all
+#define FIFO_DECIMATION_NO_DECIMATION_ACC       ((uint8_t)0x01 << 3)
+#define FIFO_DECIMATION_2_ACC                   ((uint8_t)0x02 << 3)
+#define FIFO_DECIMATION_3_ACC                   ((uint8_t)0x03 << 3)
+#define FIFO_DECIMATION_4_ACC                   ((uint8_t)0x04 << 3)
+#define FIFO_DECIMATION_8_ACC                   ((uint8_t)0x05 << 3)
+#define FIFO_DECIMATION_16_ACC                  ((uint8_t)0x06 << 3)
+#define FIFO_DECIMATION_32_ACC                  ((uint8_t)0x07 << 3)
 
-#define FIFO_ODR_DISABLED   (0x00)
-#define FIFO_ODR_12_5Hz     (0x01 << 3)
-#define FIFO_ODR_26Hz       (0x02 << 3)
-#define FIFO_ODR_52Hz       (0x03 << 3)
-#define FIFO_ODR_104Hz      (0x04 << 3)
-#define FIFO_ODR_208Hz      (0x05 << 3)
-#define FIFO_ODR_416Hz      (0x06 << 3)
-#define FIFO_ODR_833Hz      (0x07 << 3)
-#define FIFO_ODR_1666Hz     (0x08 << 3)
-#define FIFO_ODR_3333Hz     (0x09 << 3)
-#define FIFO_ODR_6666Hz     (0x0A << 3)
+#define FIFO_ODR_DISABLED   ((uint8_t)0x00 << 3)
+#define FIFO_ODR_12_5Hz     ((uint8_t)0x01 << 3)
+#define FIFO_ODR_26Hz       (uint8_t)(0x02 << 3)
+#define FIFO_ODR_52Hz       ((uint8_t)0x03 << 3)
+#define FIFO_ODR_104Hz      ((uint8_t)0x04 << 3)
+#define FIFO_ODR_208Hz      ((uint8_t)0x05 << 3)
+#define FIFO_ODR_416Hz      ((uint8_t)0x06 << 3)
+#define FIFO_ODR_833Hz      ((uint8_t)0x07 << 3)
+#define FIFO_ODR_1666Hz     ((uint8_t)0x08 << 3)
+#define FIFO_ODR_3333Hz     ((uint8_t)0x09 << 3)
+#define FIFO_ODR_6666Hz     ((uint8_t)0x0A << 3)
 
 #define DRDY_PULSE_CFG      0x0B
 
@@ -118,6 +125,9 @@
 #define MD_CFG_WAKEUP_IRQ_EN    0x20
 
 #define TAP_CFG_FUNC_IRQ_EN         0x80
+#define TAP_CFG_X_AXIS_IRQ_EN       0x08
+#define TAP_CFG_Y_AXIS_IRQ_EN       0x04
+#define TAP_CFG_Z_AXIS_IRQ_EN       0x02
 #define TAP_CFG_FUNC_IRQ_LATCH      0x01
 
 #define ACC_ODR_POWER_DOWN  0x00
@@ -136,6 +146,8 @@
 
 #define CTRL1_LPF1_BW_SEL                       0x02
 #define CTRL3_BLOCK_DATA_UPDATE_SYNCHRONEOUS    0x40
+#define IMU_IRQ_PIN_STATE_LO_TO_HI              (0x00 << 5)
+#define IMU_IRQ_PIN_STATE_HI_TO_LO              (0x01 << 5)
 #define CTRL4_DEN_DRDY_INT1_ENABLE              0x08
 #define CTRL4_I2C_DISABLE                       0x04
 #define CTRL6_XL_HM_MODE_DISABLED               0x10
@@ -162,7 +174,7 @@ void ImuTurnOff();
 
 void ImuWriteRegister(uint8_t address, uint8_t* data, uint16_t dataSize);
 
-void ImuReadRegister(uint8_t address, uint8_t* data, uint16_t dataSize);
+void ImuReadRegister(uint8_t address, void* data, uint16_t dataSize);
 
 void ImuInitSoftware();
 
@@ -190,7 +202,7 @@ void AccelerometerSetFiltering();
 
 uint8_t ImuReadStatusReg();
 
-void ImuEnableDataReadyHardwareIRQ();
+void ImuEnableDataReadySignal();
 
 void ImuGetIdleAcceleration();
 
@@ -199,7 +211,7 @@ void ImuGetSample();
 int32_t ImuGetMeanResultantAccelerationValue();
 
 
-void ImuSetWakeUpPinInt2();
+void ImuSetWakeUpIntPin(uint8_t pinNumber);
 
 void ImuEnableWakeUpIRQ();
 
@@ -211,6 +223,33 @@ void ImuSetWakeUpIrqThreshold(uint8_t threshold);
 
 void ImuSetWakeUpIrqTriggerSamplesCount(uint8_t xlOdrCycles);
 
+void ImuConfigureIrqPinState(uint8_t irq_pin_state_);
+
 void ImuConfigureWakeUpIRQ();
+
+void ImuEnableDataRefreshBlockTillPairRead();
+
+
+void ImuFifoConfigure();
+
+void ImuSetFifoIntThreshold();
+
+void ImuSetFifoDecimationODR(uint8_t decimationGyro, uint8_t decimationAcc);
+
+void ImuSetFifoODR(uint8_t odr);
+
+void ImuSetFifoMode(uint8_t mode);
+
+void ImuFifoFlush();
+
+void ImuFifoStop();
+
+void ImuFifoStart();
+
+uint16_t ImuFifoGetSamplesCount();
+
+void ImuFifoReadSingleSample(imu_sample_set_t* sample);
+
+void ImuFifoGetAllSamples(imu_sample_set_t* sampleArray, uint16_t sampleArraySize);
 
 #endif /* UTILS_LSM6DSM_H_ */

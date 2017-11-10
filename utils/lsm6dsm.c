@@ -20,11 +20,14 @@ static imu_sample_set_t _imuIdleAcceleration;
 static imu_sample_set_t _imuSampleBuffer[IMU_SAMPLE_BUFFER_SIZE];
 static uint32_t         _imuResultantVectorsLength[IMU_SAMPLE_BUFFER_SIZE];
 static uint16_t         _imuSampleIndex;
+static bool             _isGyroStarted = false;
+static bool             _isGyroInFifo = false;
 
 void ImuInit()
 {
     nrf_gpio_cfg_input(ACC_INTERRUPT_1_PIN, NRF_GPIO_PIN_PULLDOWN);
     nrf_gpio_cfg_input(ACC_INTERRUPT_2_PIN, NRF_GPIO_PIN_PULLDOWN);
+
     nrf_gpio_cfg_output(ACC_ENABLE_PIN);
     ImuTurnOff();
 
@@ -40,12 +43,29 @@ void ImuTurnOn()
 {
     nrf_gpio_pin_clear(ACC_ENABLE_PIN);
     SystickDelayMs(15);
+
     ImuInitSoftware();
 }
 
 void ImuTurnOff()
 {
     nrf_gpio_pin_set(ACC_ENABLE_PIN);
+}
+
+void ImuInitSoftware()
+{
+    AccelerometerSetLowPower();
+    GyroPowerDown();
+
+    AccelerometerSetODR();
+
+//    AccelerometerSetFiltering();
+
+//    ImuEnableDataReadySignal();
+
+    ImuEnableDataRefreshBlockTillPairRead();
+
+    ImuConfigureWakeUpIRQ();
 }
 
 void ImuWriteRegister(uint8_t address, uint8_t* data, uint16_t dataSize)
@@ -65,7 +85,7 @@ void ImuWriteRegister(uint8_t address, uint8_t* data, uint16_t dataSize)
     free(buf);
 }
 
-void ImuReadRegister(uint8_t address, uint8_t* data, uint16_t dataSize)
+void ImuReadRegister(uint8_t address, void* data, uint16_t dataSize)
 {
     address |= 0x80;
 
@@ -83,6 +103,7 @@ void AccelerometerSetODR()
     uint8_t data = 0;
 
     ImuReadRegister(CTRL1_XL_REG, &data, 1);
+    data &= 0x0F;
     data |= ACC_GYR_ODR_12_5Hz;
     ImuWriteRegister(CTRL1_XL_REG, &data, 1);
 }
@@ -99,8 +120,11 @@ void GyroSetODR()
 {
     uint8_t data = 0;
     ImuReadRegister(CTRL2_G_REG, &data, 1);
+    data &= 0x0F;
     data |= ACC_GYR_ODR_12_5Hz;
     ImuWriteRegister(CTRL2_G_REG, &data, 1);
+
+    _isGyroStarted = true;
 }
 
 void GyroPowerDown()
@@ -109,6 +133,8 @@ void GyroPowerDown()
     ImuReadRegister(CTRL2_G_REG, &data, 1);
     data |= ACC_ODR_POWER_DOWN;
     ImuWriteRegister(CTRL2_G_REG, &data, 1);
+
+    _isGyroStarted = false;
 }
 
 void AccelerometerSetLowPower()
@@ -166,7 +192,7 @@ uint8_t ImuReadStatusReg()
  * @brief This function enables the BDU function. The Accelerometer does not refresh the sample in Gyro, Acc or temperature
  * until BOTH of the MSB and LSB in the pair (REG_H and REG_L) are read
  */
-static void ImuEnableDataRefreshBlockTillPairRead()
+void ImuEnableDataRefreshBlockTillPairRead()
 {
     uint8_t data = 0;
     ImuReadRegister(CTRL3_C_REG, &data, 1);
@@ -197,23 +223,6 @@ void ImuEnableDataReadySignal()
     ImuWriteRegister(CTRL4_C_REG, &data, 1);
 }
 
-void ImuInitSoftware()
-{
-    AccelerometerSetLowPower();
-    GyroSetLowPower();
-
-    AccelerometerSetODR();
-    GyroPowerDown();
-
-    AccelerometerSetFiltering();
-
-//    ImuEnableDataReadyHardwareIRQ();
-
-    ImuEnableDataRefreshBlockTillPairRead();
-
-    ImuConfigureWakeUpIRQ();
-}
-
 void ImuGetSample()
 {
     ImuReadRegister(OUT_X_G_L, (uint8_t*)&_imuSampleBuffer[_imuSampleIndex], sizeof(imu_sample_set_t));
@@ -227,20 +236,40 @@ void ImuGetIdleAcceleration()
 
 /* ####################################################################################################################################### */
 /*                                                          DETECT TRACK START                                                             */
-void ImuSetWakeUpPinInt2()
+void ImuSetWakeUpIntPin(uint8_t pinNumber)
 {
+    uint8_t regValue = 0;
     uint8_t reg = 0;
-    ImuReadRegister(MD2_CFG_REG, &reg, sizeof(reg));
-    reg |= MD_CFG_WAKEUP_IRQ_EN;
-    ImuWriteRegister(MD2_CFG_REG, &reg, sizeof(reg));
+
+    if (pinNumber == 1)
+    {
+        reg = MD1_CFG_REG;
+    }
+    else
+    {
+        reg = MD2_CFG_REG;
+    }
+
+    ImuReadRegister(reg, &regValue, sizeof(regValue));
+    regValue |= MD_CFG_WAKEUP_IRQ_EN;
+    ImuWriteRegister(reg, &regValue, sizeof(regValue));
+
+
+    ImuReadRegister(reg, &regValue, sizeof(regValue));
 }
+
+
 
 void ImuEnableWakeUpIRQ()
 {
     uint8_t reg = 0;
     ImuReadRegister(TAP_CFG_REG, &reg, sizeof(reg));
-    reg |= TAP_CFG_FUNC_IRQ_EN | TAP_CFG_FUNC_IRQ_LATCH;
+    reg |=  TAP_CFG_FUNC_IRQ_EN;
     ImuWriteRegister(TAP_CFG_REG, &reg, sizeof(reg));
+
+
+    ImuReadRegister(TAP_CFG_REG, &reg, sizeof(reg));
+
 }
 
 void ImuDisableWakeUpIRQ()
@@ -270,6 +299,9 @@ void ImuSetWakeUpIrqThreshold(uint8_t threshold)
     threshold &= 0b00111111; //< Mask Single/Double Tap bit and required 0 bit
 
     ImuWriteRegister(WAKE_UP_THRESH_REG, &threshold, sizeof(threshold));
+
+
+    ImuReadRegister(WAKE_UP_THRESH_REG, &threshold, sizeof(threshold));
 }
 
 /**
@@ -287,20 +319,34 @@ void ImuSetWakeUpIrqTriggerSamplesCount(uint8_t xlOdrCycles)
     regValue |= (xlOdrCycles << 5);
     ImuWriteRegister(WAKE_UP_DUR_REG, &regValue, sizeof(regValue));
     regValue = 0;
+
+
     ImuReadRegister(WAKE_UP_DUR_REG, &regValue, sizeof(regValue));
 }
 
+void ImuConfigureIrqPinState(uint8_t irq_pin_state_)
+{
+    uint8_t regValue = 0;
+    ImuReadRegister(CTRL3_C_REG, &regValue, sizeof(regValue));
+    regValue &= ~0x20;
+    regValue |= (irq_pin_state_ & 0x20);
+    ImuWriteRegister(CTRL3_C_REG, &regValue, sizeof(regValue));
+}
 
 void ImuConfigureWakeUpIRQ()
 {
-    ImuSetWakeUpIrqThreshold(WAKEUP_ACC_THRESHOLD);
-    ImuSetWakeUpIrqTriggerSamplesCount(2);
+    ImuSetWakeUpIrqThreshold(WAKEUP_ACC_THRESHOLD);//);
+    ImuSetWakeUpIrqTriggerSamplesCount(0);
 
     ImuEnableWakeUpIRQ();
 
     RTCDelay(NRF_RTC1, RTC1_MS_TO_TICKS(10));
 
-    ImuSetWakeUpPinInt2();
+    ImuConfigureIrqPinState(IMU_IRQ_PIN_STATE_HI_TO_LO);
+
+    ImuSetWakeUpIntPin(1);
+
+    ImuSetWakeUpIntPin(2);
 }
 
 /* ####################################################################################################################################### */
@@ -346,95 +392,122 @@ static int32_t _CalculateMeanValue(void* vector, uint32_t vectorSize, uint8_t wo
 /* ####################################################################################################################################### */
 /*                                                          FIFO CONFIGURATION                                                             */
 
-//void ImuSetFifoIntThreshold()
-//{
-//    uint16_t threshold = 0x0600;
-//
-//    ImuWriteRegister(FIFO_CTRL1_REG, (uint8_t*)&threshold, sizeof(threshold));
-//}
-//
-//void ImuSetFifoDecimationODR(uint8_t decimationGyroAndFifo)
-//{
-//    uint8_t reg = 0;
-//    ImuReadRegister(FIFO_CTRL3_REG, &reg, sizeof(reg));
-//
-//    reg &= 0b11000000;
-//    reg |= decimationGyroAndFifo;
-//
-//    ImuWriteRegister(FIFO_CTRL3_REG, &reg, sizeof(reg));
-//}
-//
-//void ImuSetFifoODR(uint8_t odr)
-//{
-//    uint8_t reg = 0;
-//    ImuReadRegister(FIFO_CTRL5_REG, &reg, sizeof(reg));
-//
-//    reg &= 0b10000111;
-//    reg |= odr;
-//
-//    ImuWriteRegister(FIFO_CTRL5_REG, &reg, sizeof(reg));
-//}
-//
-//void ImuSetFifoMode(uint8_t mode)
-//{
-//    uint8_t reg = 0;
-//    ImuReadRegister(FIFO_CTRL5_REG, &reg, sizeof(reg));
-//
-//    reg &= 0b11111000;
-//    reg |= mode;
-//
-//    ImuWriteRegister(FIFO_CTRL5_REG, &reg, sizeof(reg));
-//}
-//
-///**
-// * @brief This function configures the internal IMU fifo in the FIFO mode (single buffer, not continuous)
-// */
-//void ImuFifoConfigure()
-//{
-//    ImuSetFifoMode(FIFO_MODE_BYPASS);
-//
-//    // Enable both GYRO and ACC data in the fifo with no decimation
-//    ImuSetFifoDecimationODR(FIFO_DECIMATION_NO_DECIMATION_GYRO |
-//                            FIFO_DECIMATION_NO_DECIMATION_ACC);
-//
-//    ImuSetFifoODR(FIFO_ODR_26Hz);
-//}
-//
-//
-//void ImuFifoFlush()
-//{
-//    // Set to Bypass mode
-//    _ImuSetFifoMode(FIFO_MODE_BYPASS);
-//    // Set to Fifo mode
-//    _ImuSetFifoMode(FIFO_MODE_FIFO);
-//}
-//
-//uint16_t ImuFifoGetSamplesCount()
-//{
-//    uint16_t samplesCount = 0;
-//    ImuReadRegister(FIFO_STATUS1, &samplesCount, sizeof(samplesCount));
-//
-//    return samplesCount;
-//}
-//
-//void ImuFifoReadSingleSample(imu_sample_set_t* sample)
-//{
-//    // Read the order Gx, Gy, Gz, Ax, Ay, Az
-//    for (uint8_t i=0; i< sizeof(imu_sample_set_t)/2; ++i)
-//    {
-//        ImuReadRegister(FIFO_DATA_OUT_L, sample + i*sizeof(uint16_t), sizeof(uint16_t));
-//    }
-//}
-//
-//void ImuFifoGetAllSamples(imu_sample_set_t* sampleArray, uint16_t sampleArraySize)
-//{
-//    uint16_t samplesCount = ImuFifoGetSamplesCount();
-//
-//    for(uint16_t i=0; i<samplesCount; ++i)
-//    {
-//        ImuFifoReadSingleSample(sampleArray + i);
-//    }
-//}
+void ImuSetFifoIntThreshold()
+{
+    uint16_t threshold = 0x0600;
+
+    ImuWriteRegister(FIFO_CTRL1_REG, (uint8_t*)&threshold, sizeof(threshold));
+}
+
+void ImuSetFifoDecimationODR(uint8_t decimationGyro, uint8_t decimationAcc)
+{
+    uint8_t reg = 0;
+    ImuReadRegister(FIFO_CTRL3_REG, &reg, sizeof(reg));
+
+    reg &= 0b11000000;
+    reg |= decimationGyro | decimationAcc;
+
+    if (decimationGyro)
+    {
+        _isGyroInFifo = true;
+    }
+    else
+    {
+        _isGyroInFifo = false;
+    }
+
+    ImuWriteRegister(FIFO_CTRL3_REG, &reg, sizeof(reg));
+}
+
+void ImuSetFifoODR(uint8_t odr)
+{
+    uint8_t reg = 0;
+    ImuReadRegister(FIFO_CTRL5_REG, &reg, sizeof(reg));
+
+    reg &= 0b10000111;
+    reg |= odr;
+
+    ImuWriteRegister(FIFO_CTRL5_REG, &reg, sizeof(reg));
+}
+
+void ImuSetFifoMode(uint8_t mode)
+{
+    uint8_t reg = 0;
+    ImuReadRegister(FIFO_CTRL5_REG, &reg, sizeof(reg));
+
+    reg &= 0b11111000;
+    reg |= mode;
+
+    ImuWriteRegister(FIFO_CTRL5_REG, &reg, sizeof(reg));
+}
+
+/**
+ * @brief This function configures the internal IMU fifo in the FIFO mode (single buffer, not continuous)
+ */
+void ImuFifoConfigure()
+{
+    ImuSetFifoMode(FIFO_MODE_BYPASS);
+
+    // Enable both GYRO and ACC data in the fifo with no decimation
+    ImuSetFifoDecimationODR(FIFO_DECIMATION_NO_DECIMATION_GYRO,
+                            FIFO_DECIMATION_NO_DECIMATION_ACC);
+
+    ImuSetFifoODR(FIFO_ODR_12_5Hz);
+}
+
+
+void ImuFifoFlush()
+{
+    // Set to Bypass mode
+    ImuSetFifoMode(FIFO_MODE_BYPASS);
+    // Set to Fifo mode
+    ImuSetFifoMode(FIFO_MODE_FIFO);
+}
+
+void ImuFifoStop()
+{
+    ImuSetFifoMode(FIFO_MODE_BYPASS);
+}
+
+void ImuFifoStart()
+{
+    ImuFifoFlush();
+}
+
+uint16_t ImuFifoGetSamplesCount()
+{
+    uint16_t samplesCount = 0;
+    uint8_t divider = 1;
+
+    ImuReadRegister(FIFO_STATUS1, &samplesCount, sizeof(samplesCount));
+
+    if (_isGyroInFifo)
+        divider = sizeof(imu_sample_set_t)/sizeof(int16_t);
+    else
+    {
+        divider = sizeof(imu_sample_set_t)/(2*sizeof(int16_t));
+    }
+    return samplesCount/divider;
+}
+
+void ImuFifoReadSingleSample(imu_sample_set_t* sample)
+{
+    // Read the order Gx, Gy, Gz, Ax, Ay, Az
+    for (uint8_t i=0; i< sizeof(imu_sample_set_t)/2; ++i)
+    {
+        ImuReadRegister(FIFO_DATA_OUT_L, sample + i*sizeof(uint16_t), sizeof(uint16_t));
+    }
+}
+
+void ImuFifoGetAllSamples(imu_sample_set_t* sampleArray, uint16_t sampleArraySize)
+{
+    uint16_t samplesCount = ImuFifoGetSamplesCount();
+
+    for(uint16_t i=0; i<samplesCount; ++i)
+    {
+        ImuFifoReadSingleSample(sampleArray + i);
+    }
+}
 
 /* ####################################################################################################################################### */
 

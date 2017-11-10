@@ -33,15 +33,71 @@ void TaskScanForKeyTag()
     BleCentralScanStart();
 }
 
+void TaskStartNewTrack()
+{
+    if (!isTrackInProgress)
+    {
+        ImuDisableWakeUpIRQ();
+        TaskScanForKeyTag();
+        Mem_Org_Track_Start_Storage();
+        SchedulerAddOperation(TaskAlarmTimeout, alarmTimeoutMs, &alarmTimeoutTaskId, false);
+        SchedulerAddOperation(TaskGpsGetSample, gpsSamplingPeriodMs, &gpsSamplingTaskId, true);
+        GsmHttpSendStartTrack();
+        SubtaskStartTrackAssessment();
+        isTrackInProgress = true;
+    }
+}
+
+/**
+ * @brief This task is triggered when during the time window after vehicle movement detection the Main board did not receive correct deactivating command
+ *          from the Key Tag. It triggers Task Alarm send location - which continuously sends sms with vehicle location every cycle
+ *          set by \ref alarmSmsPeriod (default 10 mins). It can be stopped by sending SMS from the owner phone
+ */
+void TaskAlarmTimeout()
+{
+    if (isAlarmActivated)
+    {
+        TaskAlarmSendLocation();
+        SchedulerAddOperation(TaskAlarmSendLocation, alarmSmsPeriodMs, &alarmTaskId, true);
+        isAlarmTriggered = true;
+    }
+}
+
+/**
+ * @brief This task is triggered when the Main Board received correct deactivating command from the Key Tag
+ */
+void TaskDeactivateAlarm()
+{
+    SchedulerCancelOperation(&alarmTimeoutTaskId);
+    isAlarmTriggered = false;
+}
+
+/**
+ * @brief This task should be triggered via SMS from the user to clear false alarms
+ */
+void TaskAbortAlarm()
+{
+    SchedulerCancelOperation(&alarmTaskId);
+    isAlarmTriggered = false;
+    isAlarmActivated = true;
+}
+
+/**
+ * @brief This task collects every \ref gpsSamplingPeriodMs a sample with vehicle's GPS localization
+ */
 void TaskGpsGetSample(void)
 {
     memset(&gpsLastSample, 0, sizeof(gpsLastSample));
     GpsRequestMessage(GPS_MSG_GGA);
     GpsRequestMessage(GPS_MSG_VTG);
+    gpsLastSample.acceleration = SubtaskGetAcceleration();
     GsmHttpSendSample(&gpsLastSample);
 //    Mem_Org_Store_Sample();
 }
 
+/**
+ * @brief This task sends every \ref alarmSmsPeriodMs an SMS with vehicle's location on the user phone
+ */
 void TaskAlarmSendLocation()
 {
     char telNum[12];
@@ -69,49 +125,30 @@ void TaskAlarmSendLocation()
     GsmSmsSend(telNum, localization);
 }
 
-void TaskAlarmTimeout()
+void SubtaskStartTrackAssessment()
 {
-    if (isAlarmActivated)
-    {
-        TaskAlarmSendLocation();
-        SchedulerAddOperation(TaskAlarmSendLocation, alarmSmsPeriodMs, &alarmTaskId, true);
-        isAlarmTriggered = true;
-    }
+    ImuFifoStart();
 }
 
-void TaskDeactivateAlarm()
+int16_t SubtaskGetAcceleration()
 {
-    SchedulerCancelOperation(&alarmTimeoutTaskId);
-    isAlarmTriggered = false;
+    ImuFifoGetAllSamples();
+    ImuFifoFlush();
 }
 
-void TaskAbortAlarm()
+void SubtaskStopTrackAssessment()
 {
-    SchedulerCancelOperation(&alarmTaskId);
-    isAlarmTriggered = false;
-    isAlarmActivated = true;
-}
-
-void TaskStartNewTrack()
-{
-    if (!isTrackInProgress)
-    {
-        ImuDisableWakeUpIRQ();
-        TaskScanForKeyTag();
-        Mem_Org_Track_Start_Storage();
-        SchedulerAddOperation(TaskAlarmTimeout, alarmTimeoutMs, &alarmTimeoutTaskId, false);
-        SchedulerAddOperation(TaskGpsGetSample, gpsSamplingPeriodMs, &gpsSamplingTaskId, true);
-        GsmHttpSendStartTrack();
-        isTrackInProgress = true;
-    }
+    ImuFifoStop();
 }
 
 void TaskEndCurrentTrack()
 {
     Mem_Org_Track_Stop_Storage();
     SchedulerCancelOperation(&gpsSamplingTaskId);
-    GsmHttpEndTrack();
+    SubtaskStopTrackAssessment();
     ImuEnableWakeUpIRQ();
+
+    GsmHttpEndTrack();
     isTrackInProgress = false;
 }
 

@@ -69,17 +69,17 @@ void GpioteInit()
                             (NFC_IRQ_PIN << GPIOTE_CONFIG_PSEL_Pos);
 
     NRF_GPIOTE->CONFIG[2] = (GPIOTE_CONFIG_MODE_Event << GPIOTE_CONFIG_MODE_Pos) |
-                            (GPIOTE_CONFIG_POLARITY_LoToHi << GPIOTE_CONFIG_POLARITY_Pos) |
+                            (GPIOTE_CONFIG_POLARITY_HiToLo << GPIOTE_CONFIG_POLARITY_Pos) |
                             (ACC_INTERRUPT_1_PIN << GPIOTE_CONFIG_PSEL_Pos);
 
     NRF_GPIOTE->CONFIG[3] = (GPIOTE_CONFIG_MODE_Event << GPIOTE_CONFIG_MODE_Pos) |
-                            (GPIOTE_CONFIG_POLARITY_LoToHi << GPIOTE_CONFIG_POLARITY_Pos) |
+                            (GPIOTE_CONFIG_POLARITY_HiToLo << GPIOTE_CONFIG_POLARITY_Pos) |
                             (ACC_INTERRUPT_2_PIN << GPIOTE_CONFIG_PSEL_Pos);
 
     NRF_GPIOTE->INTENSET = GPIOTE_INTENSET_IN0_Enabled << GPIOTE_INTENSET_IN0_Pos |
                            GPIOTE_INTENSET_IN1_Enabled << GPIOTE_INTENSET_IN1_Pos |
                            GPIOTE_INTENSET_IN2_Enabled << GPIOTE_INTENSET_IN2_Pos |
-                           GPIOTE_INTENSET_IN3_Enabled << GPIOTE_INTENSET_IN2_Pos;
+                           GPIOTE_INTENSET_IN3_Enabled << GPIOTE_INTENSET_IN3_Pos;
 
 
 

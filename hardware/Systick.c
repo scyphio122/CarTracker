@@ -21,6 +21,8 @@ void SysTick_Handler()
 	{
 		systickTimeoutFlag = true;
 	}
+
+	SchedulerCheckOperations();
 }
 
 void SystickInit()

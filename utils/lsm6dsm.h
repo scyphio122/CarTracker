@@ -107,6 +107,10 @@
 #define OUT_Z_XL_L           0x2C
 #define OUT_Z_XL_H           0x2D
 
+#define X_OFS_USR_REG        0x73
+#define Y_OFS_USR_REG        0x74
+#define Z_OFS_USR_REG        0x75
+
 #define FIFO_STATUS1        0x3A
 #define FIFO_STATUS2        0x3B
 #define FIFO_STATUS3        0x3C
@@ -246,10 +250,30 @@ void ImuFifoStop();
 
 void ImuFifoStart();
 
+
+
 uint16_t ImuFifoGetSamplesCount();
 
-void ImuFifoReadSingleSample(imu_sample_set_t* sample);
+/**
+ * @brief This function gets the oldest sample in the fifo.
+ * @param sample[in] - optional pointer to the im_sample_set_t structure. If not used, should be NULL
+ */
+void ImuFifoReadSingleSampleFromFifo(imu_sample_set_t* sample);
 
-void ImuFifoGetAllSamples(imu_sample_set_t* sampleArray, uint16_t sampleArraySize);
+/**
+ * @brief This function gets the all of the samples in the fifo. At least if they will be
+ * @param optionalSampleArray[in] - optional pointer to the im_sample_set_t structures array. If not used, should be NULL
+ * @param optionalSampleArraySize[in] - size of the optionalSampleArray. If not used, should be NULL
+ * @return number of actually received samples
+ */
+uint16_t ImuFifoGetAllSamples(imu_sample_set_t* optionalSampleArray, uint16_t optionalSampleArraySize);
+
+
+int32_t ImuCalculateResultantVector3DLength(int16_t x, int16_t y, int16_t z);
+
+int32_t ImuCalculateMeanValue(void* vector, uint32_t vectorSize, uint8_t wordLength);
+
+int32_t ImuGetMeanResultantAccelerationValueFromReadSamples();
+
 
 #endif /* UTILS_LSM6DSM_H_ */

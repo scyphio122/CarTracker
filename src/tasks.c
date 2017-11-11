@@ -18,19 +18,31 @@
 #include "ble_central.h"
 #include "lsm6dsm.h"
 
+volatile int8_t     imuMovementCheckTaskId = -1;
+volatile int8_t     gpsSamplingTaskId = -1;
+volatile int8_t     alarmTimeoutTaskId = -1;
+volatile int8_t     alarmTaskId = -1;
+
 volatile bool       isTrackInProgress = false;
 volatile bool       isAlarmActivated = true;
 volatile bool       isAlarmTriggered = false;
 volatile uint32_t   gpsSamplingPeriodMs = 10 * 1000;
-volatile int8_t     gpsSamplingTaskId = -1;
 volatile uint32_t   alarmTimeoutMs  = 60 * 1000;
 volatile uint32_t   alarmSmsPeriodMs = 10 * 60 * 1000;
-volatile int8_t     alarmTimeoutTaskId = -1;
-volatile int8_t     alarmTaskId = -1;
 
-void TaskScanForKeyTag()
+void TaskStartCarMovementDetection()
 {
-    BleCentralScanStart();
+    SchedulerAddOperation(TaskCarMovementDetectionCheck, 10000, &imuMovementCheckTaskId, true);
+}
+
+void TaskCarMovementDetectionCheck()
+{
+    // If the car movement was detected, then schedule the start new track task as soon as possible
+    if (ImuIsWakeUpIRQ())
+    {
+        SchedulerCancelOperation(&imuMovementCheckTaskId);
+        SchedulerAddOperation(TaskStartNewTrack, 0, NULL, false);
+    }
 }
 
 void TaskStartNewTrack()
@@ -40,12 +52,17 @@ void TaskStartNewTrack()
         ImuDisableWakeUpIRQ();
         TaskScanForKeyTag();
         Mem_Org_Track_Start_Storage();
+        SubtaskStartTrackAssessment();
         SchedulerAddOperation(TaskAlarmTimeout, alarmTimeoutMs, &alarmTimeoutTaskId, false);
         SchedulerAddOperation(TaskGpsGetSample, gpsSamplingPeriodMs, &gpsSamplingTaskId, true);
         GsmHttpSendStartTrack();
-        SubtaskStartTrackAssessment();
         isTrackInProgress = true;
     }
+}
+
+void TaskScanForKeyTag()
+{
+    BleCentralScanStart();
 }
 
 /**
@@ -91,6 +108,7 @@ void TaskGpsGetSample(void)
     GpsRequestMessage(GPS_MSG_GGA);
     GpsRequestMessage(GPS_MSG_VTG);
     gpsLastSample.acceleration = SubtaskGetAcceleration();
+
     GsmHttpSendSample(&gpsLastSample);
 //    Mem_Org_Store_Sample();
 }
@@ -132,8 +150,10 @@ void SubtaskStartTrackAssessment()
 
 int16_t SubtaskGetAcceleration()
 {
-    ImuFifoGetAllSamples();
+    ImuFifoGetAllSamples(NULL, 0);
+    int16_t accVal = (int16_t)ImuGetMeanResultantAccelerationValueFromReadSamples();
     ImuFifoFlush();
+    return accVal;
 }
 
 void SubtaskStopTrackAssessment()

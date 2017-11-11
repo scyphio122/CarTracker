@@ -17,9 +17,16 @@
 #include "RTC.h"
 
 static imu_sample_set_t _imuIdleAcceleration;
-static imu_sample_set_t _imuSampleBuffer[IMU_SAMPLE_BUFFER_SIZE];
+
+int16_t                 _imuGyroAxisX[IMU_SAMPLE_BUFFER_SIZE];
+int16_t                 _imuGyroAxisY[IMU_SAMPLE_BUFFER_SIZE];
+int16_t                 _imuGyroAxisZ[IMU_SAMPLE_BUFFER_SIZE];
+int16_t                 _imuAccelerometerAxisX[IMU_SAMPLE_BUFFER_SIZE];
+int16_t                 _imuAccelerometerAxisY[IMU_SAMPLE_BUFFER_SIZE];
+int16_t                 _imuAccelerometerAxisZ[IMU_SAMPLE_BUFFER_SIZE];
+
 static uint32_t         _imuResultantVectorsLength[IMU_SAMPLE_BUFFER_SIZE];
-static uint16_t         _imuSampleIndex;
+static uint16_t         _imuSamplesCount;
 static bool             _isGyroStarted = false;
 static bool             _isGyroInFifo = false;
 
@@ -45,6 +52,8 @@ void ImuTurnOn()
     SystickDelayMs(15);
 
     ImuInitSoftware();
+
+    ImuGetIdleAcceleration();
 }
 
 void ImuTurnOff()
@@ -223,15 +232,20 @@ void ImuEnableDataReadySignal()
     ImuWriteRegister(CTRL4_C_REG, &data, 1);
 }
 
-void ImuGetSample()
-{
-    ImuReadRegister(OUT_X_G_L, (uint8_t*)&_imuSampleBuffer[_imuSampleIndex], sizeof(imu_sample_set_t));
-    _imuSampleIndex++;
-}
-
 void ImuGetIdleAcceleration()
 {
     ImuReadRegister(OUT_X_G_L, (uint8_t*)&_imuIdleAcceleration, sizeof(imu_sample_set_t));
+}
+
+void ImuSetIdleCorrection(imu_sample_set_t* idleSample)
+{
+    int8_t correctionX = -1 * idleSample->acc_x;    //< X axis is internally added by the IMU to the X value
+    int8_t correctionY = -1 * idleSample->acc_y;    //< Y axis is internally added by the IMU to the Y value
+    int8_t correctionZ = idleSample->acc_z;         //< Z axis is internally subtracted by the IMU to the Z value
+
+    ImuWriteRegister(X_OFS_USR_REG, &correctionX, sizeof(correctionX));
+    ImuWriteRegister(Y_OFS_USR_REG, &correctionY, sizeof(correctionY));
+    ImuWriteRegister(Z_OFS_USR_REG, &correctionZ, sizeof(correctionZ));
 }
 
 /* ####################################################################################################################################### */
@@ -344,50 +358,11 @@ void ImuConfigureWakeUpIRQ()
 
     ImuConfigureIrqPinState(IMU_IRQ_PIN_STATE_HI_TO_LO);
 
-    ImuSetWakeUpIntPin(1);
+//    ImuSetWakeUpIntPin(1);
 
     ImuSetWakeUpIntPin(2);
 }
 
-/* ####################################################################################################################################### */
-/*                                                                CALCULATE ACCELERATIONS                                                  */
-
-static int32_t _CalculateResultantVector3DLength(int16_t x, int16_t y, int16_t z)
-{
-    int32_t x_2 = x*x;
-    int32_t y_2 = y*y;
-    int32_t z_2 = z*z;
-
-    int32_t result = 0;
-    arm_sqrt_q31(x_2 +y_2 + z_2, (q31_t*)&result);
-
-    return result;
-}
-
-static int32_t _CalculateMeanValue(void* vector, uint32_t vectorSize, uint8_t wordLength)
-{
-    int32_t result = 0;
-    switch(wordLength)
-    {
-        case 1:
-        {
-            arm_mean_q7((q7_t*)vector, vectorSize, (q7_t*)&result);
-        }break;
-
-        case 2:
-        {
-            arm_mean_q15((q15_t*)vector, vectorSize, (q15_t*)&result);
-        }break;
-
-        case 4:
-        {
-            arm_mean_q31((q31_t*)vector, vectorSize, (q31_t*)&result);
-
-        }break;
-    }
-
-    return result;
-}
 
 /* ####################################################################################################################################### */
 /*                                                          FIFO CONFIGURATION                                                             */
@@ -490,38 +465,106 @@ uint16_t ImuFifoGetSamplesCount()
     return samplesCount/divider;
 }
 
-void ImuFifoReadSingleSample(imu_sample_set_t* sample)
+void ImuFifoReadSingleSampleFromFifo(imu_sample_set_t* sample)
 {
     // Read the order Gx, Gy, Gz, Ax, Ay, Az
-    for (uint8_t i=0; i< sizeof(imu_sample_set_t)/2; ++i)
+    if (_isGyroInFifo)
     {
-        ImuReadRegister(FIFO_DATA_OUT_L, sample + i*sizeof(uint16_t), sizeof(uint16_t));
+        ImuReadRegister(FIFO_DATA_OUT_L, &_imuGyroAxisX[_imuSamplesCount], sizeof(int16_t));
+        ImuReadRegister(FIFO_DATA_OUT_L, &_imuGyroAxisY[_imuSamplesCount], sizeof(int16_t));
+        ImuReadRegister(FIFO_DATA_OUT_L, &_imuGyroAxisZ[_imuSamplesCount], sizeof(int16_t));
     }
+
+    ImuReadRegister(FIFO_DATA_OUT_L, &_imuAccelerometerAxisX[_imuSamplesCount], sizeof(int16_t));
+    ImuReadRegister(FIFO_DATA_OUT_L, &_imuAccelerometerAxisY[_imuSamplesCount], sizeof(int16_t));
+    ImuReadRegister(FIFO_DATA_OUT_L, &_imuAccelerometerAxisZ[_imuSamplesCount], sizeof(int16_t));
+
+    if (sample != NULL)
+    {
+        memset(sample, 0, sizeof(imu_sample_set_t));
+
+        if (_isGyroInFifo)
+        {
+            sample->gyro_x = _imuGyroAxisX[_imuSamplesCount];
+            sample->gyro_y = _imuGyroAxisY[_imuSamplesCount];
+            sample->gyro_z = _imuGyroAxisZ[_imuSamplesCount];
+        }
+        sample->acc_x = _imuAccelerometerAxisX[_imuSamplesCount];
+        sample->acc_y = _imuAccelerometerAxisY[_imuSamplesCount];
+        sample->acc_z = _imuAccelerometerAxisX[_imuSamplesCount];
+    }
+    return;
 }
 
-void ImuFifoGetAllSamples(imu_sample_set_t* sampleArray, uint16_t sampleArraySize)
+uint16_t ImuFifoGetAllSamples(imu_sample_set_t* optionalSampleArray, uint16_t optionalSampleArraySize)
 {
     uint16_t samplesCount = ImuFifoGetSamplesCount();
 
-    for(uint16_t i=0; i<samplesCount; ++i)
+    if (optionalSampleArray != NULL && samplesCount > optionalSampleArraySize)
     {
-        ImuFifoReadSingleSample(sampleArray + i);
+        samplesCount = optionalSampleArraySize;
     }
+
+    _imuSamplesCount = 0;
+
+    nrf_gpio_pin_set(DEBUG_2_PIN_PIN);
+    for(_imuSamplesCount=0; _imuSamplesCount<samplesCount; ++_imuSamplesCount)
+    {
+        ImuFifoReadSingleSampleFromFifo(optionalSampleArray);
+    }
+    nrf_gpio_pin_clear(DEBUG_2_PIN_PIN);
+
+    return samplesCount;
 }
 
 /* ####################################################################################################################################### */
+/*                                                                CALCULATE ACCELERATIONS                                                  */
 
-int32_t ImuGetMeanResultantAccelerationValue()
+int32_t ImuCalculateResultantVector3DLength(int16_t x, int16_t y, int16_t z)
 {
-    uint16_t samplesCount = _imuSampleIndex - 1;
-    imu_sample_set_t* samplePtr = _imuSampleBuffer;
-    for (uint16_t i=0; i<samplesCount; ++i)
+    int32_t x_2 = x*x;
+    int32_t y_2 = y*y;
+    int32_t z_2 = z*z;
+
+    int32_t result = 0;
+    arm_sqrt_q31(x_2 +y_2 + z_2, (q31_t*)&result);
+
+    return result;
+}
+
+int32_t ImuCalculateMeanValue(void* vector, uint32_t vectorSize, uint8_t wordLength)
+{
+    int32_t result = 0;
+    switch(wordLength)
     {
-        _imuResultantVectorsLength[i] = _CalculateResultantVector3DLength(samplePtr->acc_x - _imuIdleAcceleration.acc_x,
-                                                                         samplePtr->acc_y - _imuIdleAcceleration.acc_y,
-                                                                         samplePtr->acc_z - _imuIdleAcceleration.acc_z);
-        samplePtr++;
+        case 1:
+        {
+            arm_mean_q7((q7_t*)vector, vectorSize, (q7_t*)&result);
+        }break;
+
+        case 2:
+        {
+            arm_mean_q15((q15_t*)vector, vectorSize, (q15_t*)&result);
+        }break;
+
+        case 4:
+        {
+            arm_mean_q31((q31_t*)vector, vectorSize, (q31_t*)&result);
+
+        }break;
     }
 
-    return _CalculateMeanValue(_imuResultantVectorsLength, samplesCount, sizeof(int32_t));
+    return result;
+}
+
+int32_t ImuGetMeanResultantAccelerationValueFromReadSamples()
+{
+    nrf_gpio_pin_set(DEBUG_1_PIN_PIN);
+    int32_t meanAxisX = ImuCalculateMeanValue(_imuAccelerometerAxisX, _imuSamplesCount, sizeof(int16_t));
+    int32_t meanAxisY = ImuCalculateMeanValue(_imuAccelerometerAxisY, _imuSamplesCount, sizeof(int16_t));
+    int32_t meanAxisZ = ImuCalculateMeanValue(_imuAccelerometerAxisZ, _imuSamplesCount, sizeof(int16_t));
+    int32_t totalAcc = ImuCalculateResultantVector3DLength(meanAxisX, meanAxisY, meanAxisZ);
+    nrf_gpio_pin_clear(DEBUG_1_PIN_PIN);
+
+    return totalAcc;
 }

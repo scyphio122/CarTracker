@@ -86,7 +86,7 @@ C_SOURCE_FILES += $(nRF52_SDK)/components/ble/ble_advertising/ble_advertising.c
 C_SOURCE_FILES += $(nRF52_SDK)/components/libraries/fstorage/nrf_fstorage.c
 C_SOURCE_FILES += $(nRF52_SDK)/components/libraries/util/sdk_mapped_flags.c
 C_SOURCE_FILES += $(nRF52_SDK)/components/libraries/fifo/app_fifo.c
-
+C_SOURCE_FILES += src/cmsis_dsp/cmsis_dsp_math.c
 #----------------------- COMPILING FLAGS ------------------------------
 
 CFLAGS +=	$(OPTIMIZATION)
@@ -125,6 +125,7 @@ CFLAGS +=   -DS132
 CFLAGS +=   -DNRF_SDH_BLE_PERIPHERAL_LINK_COUNT=1
 CFLAGS +=   -DNRF_SDH_BLE_CENTRAL_LINK_COUNT=1
 CFLAGS +=   -DECB=1										 #AES cipher method 
+CFLAGS +=   -D__FPU_PRESENT=1
 
 ASMFLAGS += -x assembler-with-cpp
 ASMFLAGS += -DARM_MATH_CM4
@@ -143,6 +144,7 @@ LDFLAGS += -T"$(nRF52_SDK)/$(LINKER_SCRIPT)"
 LDFLAGS += -L"$(nRF52_SDK)"
 LDFLAGS += -L/home/konrad/Projects/Bare_Metal/SecuCar/Car_Tracker/libs/hard
 LDFLAGS += -L/home/konrad/Projects/Bare_Metal/SecuCar/Car_Tracker/libs
+
 LDFLAGS += --specs=nano.specs -lc -lnosys
 LDFLAGS += -lgcc
 

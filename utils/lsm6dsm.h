@@ -86,6 +86,8 @@
 #define CTRL9_XL_REG         0x18
 #define CTRL10_C_REG         0x19
 
+#define CTRL6_USR_OFFSET_REG_6BIT_LSB   0x80
+
 #define TAP_SRC_REG          0x1C
 
 #define STATUS_REG           0x1E
@@ -209,6 +211,8 @@ uint8_t ImuReadStatusReg();
 void ImuEnableDataReadySignal();
 
 void ImuGetIdleAcceleration();
+
+void ImuSetIdleCorrection(imu_sample_set_t* idleSample);
 
 void ImuGetSample();
 

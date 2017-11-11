@@ -54,6 +54,7 @@ void ImuTurnOn()
     ImuInitSoftware();
 
     ImuGetIdleAcceleration();
+    ImuSetIdleCorrection(&_imuIdleAcceleration);
 }
 
 void ImuTurnOff()
@@ -239,9 +240,15 @@ void ImuGetIdleAcceleration()
 
 void ImuSetIdleCorrection(imu_sample_set_t* idleSample)
 {
-    int8_t correctionX = -1 * idleSample->acc_x;    //< X axis is internally added by the IMU to the X value
-    int8_t correctionY = -1 * idleSample->acc_y;    //< Y axis is internally added by the IMU to the Y value
-    int8_t correctionZ = idleSample->acc_z;         //< Z axis is internally subtracted by the IMU to the Z value
+    int8_t correctionX = -1 * idleSample->acc_x/256;    //< X axis is internally added by the IMU to the X value
+    int8_t correctionY = -1 * idleSample->acc_y/256;    //< Y axis is internally added by the IMU to the Y value
+    int8_t correctionZ = idleSample->acc_z/256;         //< Z axis is internally subtracted by the IMU to the Z value
+
+    uint8_t ctrl6Reg = 0;
+    ImuReadRegister(CTRL6_C_REG, &ctrl6Reg, sizeof(ctrl6Reg));
+    ctrl6Reg &= ~0xF3;
+    ctrl6Reg |= CTRL6_USR_OFFSET_REG_6BIT_LSB;
+    ImuWriteRegister(CTRL6_C_REG, &ctrl6Reg, sizeof(ctrl6Reg));
 
     ImuWriteRegister(X_OFS_USR_REG, &correctionX, sizeof(correctionX));
     ImuWriteRegister(Y_OFS_USR_REG, &correctionY, sizeof(correctionY));

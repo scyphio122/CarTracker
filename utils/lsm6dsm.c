@@ -246,7 +246,7 @@ void ImuSetIdleCorrection(imu_sample_set_t* idleSample)
 
     uint8_t ctrl6Reg = 0;
     ImuReadRegister(CTRL6_C_REG, &ctrl6Reg, sizeof(ctrl6Reg));
-    ctrl6Reg &= ~0xF3;
+    ctrl6Reg &= 0xF3;
     ctrl6Reg |= CTRL6_USR_OFFSET_REG_6BIT_LSB;
     ImuWriteRegister(CTRL6_C_REG, &ctrl6Reg, sizeof(ctrl6Reg));
 

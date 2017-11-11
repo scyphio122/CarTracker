@@ -16,31 +16,106 @@
 #include "parsing_utils.h"
 #include "file_system.h"
 #include "ble_central.h"
+#include "lsm6dsm.h"
+
+volatile int8_t     imuMovementCheckTaskId = -1;
+volatile int8_t     gpsSamplingTaskId = -1;
+volatile int8_t     alarmTimeoutTaskId = -1;
+volatile int8_t     alarmTaskId = -1;
 
 volatile bool       isTrackInProgress = false;
 volatile bool       isAlarmActivated = true;
 volatile bool       isAlarmTriggered = false;
 volatile uint32_t   gpsSamplingPeriodMs = 10 * 1000;
-volatile int8_t     gpsSamplingTaskId = -1;
 volatile uint32_t   alarmTimeoutMs  = 60 * 1000;
 volatile uint32_t   alarmSmsPeriodMs = 10 * 60 * 1000;
-volatile int8_t     alarmTimeoutTaskId = -1;
-volatile int8_t     alarmTaskId = -1;
+
+void TaskStartCarMovementDetection()
+{
+    SchedulerAddOperation(TaskCarMovementDetectionCheck, 10000, &imuMovementCheckTaskId, true);
+}
+
+void TaskCarMovementDetectionCheck()
+{
+    // If the car movement was detected, then schedule the start new track task as soon as possible
+    if (ImuIsWakeUpIRQ())
+    {
+        SchedulerCancelOperation(&imuMovementCheckTaskId);
+        SchedulerAddOperation(TaskStartNewTrack, 0, NULL, false);
+    }
+}
+
+void TaskStartNewTrack()
+{
+    if (!isTrackInProgress)
+    {
+        ImuDisableWakeUpIRQ();
+        TaskScanForKeyTag();
+        Mem_Org_Track_Start_Storage();
+        SubtaskStartTrackAssessment();
+        SchedulerAddOperation(TaskAlarmTimeout, alarmTimeoutMs, &alarmTimeoutTaskId, false);
+        SchedulerAddOperation(TaskGpsGetSample, gpsSamplingPeriodMs, &gpsSamplingTaskId, true);
+        GsmHttpSendStartTrack();
+        isTrackInProgress = true;
+    }
+}
 
 void TaskScanForKeyTag()
 {
     BleCentralScanStart();
 }
 
+/**
+ * @brief This task is triggered when during the time window after vehicle movement detection the Main board did not receive correct deactivating command
+ *          from the Key Tag. It triggers Task Alarm send location - which continuously sends sms with vehicle location every cycle
+ *          set by \ref alarmSmsPeriod (default 10 mins). It can be stopped by sending SMS from the owner phone
+ */
+void TaskAlarmTimeout()
+{
+    if (isAlarmActivated)
+    {
+        TaskAlarmSendLocation();
+        SchedulerAddOperation(TaskAlarmSendLocation, alarmSmsPeriodMs, &alarmTaskId, true);
+        isAlarmTriggered = true;
+    }
+}
+
+/**
+ * @brief This task is triggered when the Main Board received correct deactivating command from the Key Tag
+ */
+void TaskDeactivateAlarm()
+{
+    SchedulerCancelOperation(&alarmTimeoutTaskId);
+    isAlarmTriggered = false;
+}
+
+/**
+ * @brief This task should be triggered via SMS from the user to clear false alarms
+ */
+void TaskAbortAlarm()
+{
+    SchedulerCancelOperation(&alarmTaskId);
+    isAlarmTriggered = false;
+    isAlarmActivated = true;
+}
+
+/**
+ * @brief This task collects every \ref gpsSamplingPeriodMs a sample with vehicle's GPS localization
+ */
 void TaskGpsGetSample(void)
 {
     memset(&gpsLastSample, 0, sizeof(gpsLastSample));
     GpsRequestMessage(GPS_MSG_GGA);
     GpsRequestMessage(GPS_MSG_VTG);
+    gpsLastSample.acceleration = SubtaskGetAcceleration();
+
     GsmHttpSendSample(&gpsLastSample);
 //    Mem_Org_Store_Sample();
 }
 
+/**
+ * @brief This task sends every \ref alarmSmsPeriodMs an SMS with vehicle's location on the user phone
+ */
 void TaskAlarmSendLocation()
 {
     char telNum[12];
@@ -68,46 +143,31 @@ void TaskAlarmSendLocation()
     GsmSmsSend(telNum, localization);
 }
 
-void TaskAlarmTimeout()
+void SubtaskStartTrackAssessment()
 {
-    if (isAlarmActivated)
-    {
-        TaskAlarmSendLocation();
-        SchedulerAddOperation(TaskAlarmSendLocation, alarmSmsPeriodMs, &alarmTaskId, true);
-        isAlarmTriggered = true;
-    }
+    ImuFifoStart();
 }
 
-void TaskDeactivateAlarm()
+int16_t SubtaskGetAcceleration()
 {
-    SchedulerCancelOperation(&alarmTimeoutTaskId);
-    isAlarmTriggered = false;
+    ImuFifoGetAllSamples(NULL, 0);
+    int16_t accVal = (int16_t)ImuGetMeanResultantAccelerationValueFromReadSamples();
+    ImuFifoFlush();
+    return accVal;
 }
 
-void TaskAbortAlarm()
+void SubtaskStopTrackAssessment()
 {
-    SchedulerCancelOperation(&alarmTaskId);
-    isAlarmTriggered = false;
-    isAlarmActivated = true;
-}
-
-void TaskStartNewTrack()
-{
-    if (!isTrackInProgress)
-    {
-        TaskScanForKeyTag();
-        Mem_Org_Track_Start_Storage();
-        SchedulerAddOperation(TaskAlarmTimeout, alarmTimeoutMs, &alarmTimeoutTaskId, false);
-        SchedulerAddOperation(TaskGpsGetSample, gpsSamplingPeriodMs, &gpsSamplingTaskId, true);
-        GsmHttpSendStartTrack();
-        isTrackInProgress = true;
-    }
+    ImuFifoStop();
 }
 
 void TaskEndCurrentTrack()
 {
     Mem_Org_Track_Stop_Storage();
     SchedulerCancelOperation(&gpsSamplingTaskId);
+    SubtaskStopTrackAssessment();
+    ImuEnableWakeUpIRQ();
+
     GsmHttpEndTrack();
     isTrackInProgress = false;
 }

@@ -40,6 +40,7 @@
 #include "fifo.h"
 #include "request_fifos.h"
 #include "file_system.h"
+#include "lsm6dsm.h"
 //#include "nfc.h"
 /*
  *
@@ -103,6 +104,8 @@ void InitDeviceData()
 //    Mem_Org_Init();
 }
 
+extern void initialise_monitor_handles(void);
+
 __attribute__((optimize("O0")))
 int main(void)
 {
@@ -132,6 +135,49 @@ NRF_CLOCK->TRACECONFIG = 0;
 	nrf_gpio_cfg_output(DEBUG_2_PIN_PIN);
 	nrf_gpio_pin_clear(DEBUG_2_PIN_PIN);
 
+	uint8_t data = 0x44;
+
+//    GsmGpsInit();
+
+
+	ImuInit();
+
+	ImuTurnOn();
+
+    GpioteInit();
+
+    ImuFifoConfigure();
+
+	imu_sample_set_t sample;
+	uint8_t reg_value = 0;
+	uint16_t buf[64];
+	int cnt = 0;
+	memset(buf, 0, sizeof(buf));
+
+	ImuFifoFlush();
+	do
+	{
+
+//	    ImuReadRegister(WAKE_UP_SRC_REG, &reg_value, sizeof(reg_value));
+	    buf[cnt++] = ImuFifoGetSamplesCount();
+	    ImuReadRegister(OUT_X_G_L, &sample, sizeof(sample));
+	    SystickDelayMs(100);
+
+	    if (cnt == 64)
+	    {
+	        nrf_gpio_pin_clear(DEBUG_2_PIN_PIN);
+	    }
+	}while (1);
+
+//	do
+//	{
+// 	    ImuReadRegister(WHO_AM_I_REG, (uint8_t*)&data, 1);
+//	    SystickDelayMs(10);
+//	} while (1);
+////
+//    while(1)
+//        __WFE();
+
 //	rtc_time_t time;
 //	rtc_date_t date;
 //	time.hour = 21;
@@ -143,41 +189,38 @@ NRF_CLOCK->TRACECONFIG = 0;
 //	date.year = 2017;
 //	uint32_t timestamp = RtcConvertDateTimeToTimestamp(&time, &date);
 //	IntFlashErasePage((uint32_t*)PERSISTENT_CONFIG_PAGE_ADDRESS);
-	GsmGpsInit();
 
-	gps_coord_t lat;
-	gps_coord_t lon;
+//	gps_coord_t lat;
+//	gps_coord_t lon;
+//
+//	lat.degrees = 52;
+//	lat.minutes = 10;
+//	lat.seconds = 8058;
+//
+//	lon.degrees = 21;
+//	lon.minutes = 3;
+//	lon.seconds = 4160;
+//
+//    GpsPowerOn();
+//
+//	GpsSetReferencePosition(&lat, &lon);
+//	GpsAgpsTrigger();
+//
+//      do
+//      {
+////          GpsGetData();
+//          GpsRequestMessage(GPS_MSG_GGA);
+//          if (gpsLastSample.fixStatus != GPS_FIX_NO_FIX && gpsLastSample.fixStatus != 0)
+//          {
+//              nrf_gpio_pin_clear(DEBUG_1_PIN_PIN);
+//              nrf_gpio_pin_set(DEBUG_2_PIN_PIN);
+//              break;
+//          }
+//
+//          SystickDelayMs(60000);
+//      }while (1);
 
-	lat.degrees = 52;
-	lat.minutes = 10;
-	lat.seconds = 8058;
 
-	lon.degrees = 21;
-	lon.minutes = 3;
-	lon.seconds = 4160;
-
-    GpsPowerOn();
-
-	GpsSetReferencePosition(&lat, &lon);
-	GpsAgpsTrigger();
-
-      do
-      {
-//          GpsGetData();
-          GpsRequestMessage(GPS_MSG_GGA);
-          if (gpsLastSample.fixStatus != GPS_FIX_NO_FIX && gpsLastSample.fixStatus != 0)
-          {
-              nrf_gpio_pin_clear(DEBUG_1_PIN_PIN);
-              nrf_gpio_pin_set(DEBUG_2_PIN_PIN);
-              break;
-          }
-
-          SystickDelayMs(60000);
-      }while (1);
-
-	while(1)
-	    __WFE();
-    GpioteInit();
 
 
 //
@@ -237,6 +280,8 @@ NRF_CLOCK->TRACECONFIG = 0;
 //
 //    uint32_t encryptTime = (encryptEnd - encryptStart);
 //    uint32_t decryptTime = decryptEnd - decryptStart;
+
+	TaskStartCarMovementDetection();
 
 	while(1)
 	{

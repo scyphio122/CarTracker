@@ -17,10 +17,18 @@ volatile uint32_t scheduler_current_time_ms;
 
 scheduler_error_code_e SchedulerCheckOperations()
 {
+    scheduler_current_time_ms++;
     for (uint8_t i=0; i< SCHEDULER_BUFFER_SIZE; ++i)
     {
-        if (_scheduleBuffer[i].isInProgress == true && _scheduleBuffer[i].timeFromNowMs == scheduler_current_time_ms)
+        if (_scheduleBuffer[i].isInProgress == true &&
+            _scheduleBuffer[i].triggerTime == scheduler_current_time_ms)
         {
+            // If it is cyclic task - reschedule the next cycle
+            if (_scheduleBuffer[i].isCyclic)
+            {
+                _scheduleBuffer[i].triggerTime = scheduler_current_time_ms +_scheduleBuffer[i].timePeriodMs;
+            }
+
             _scheduleBuffer[i].isTimedOut = true;
         }
     }
@@ -32,6 +40,12 @@ scheduler_error_code_e SchedulerAddOperation(void (*callback)(void), volatile ui
 {
     scheduler_entry_t entry;
 
+    // Just safe guard not to miss the time
+    if (timeMsFromNow < 2)
+    {
+        timeMsFromNow = 2;
+    }
+
     for (uint8_t i=0; i< SCHEDULER_BUFFER_SIZE; ++i)
     {
         if (_scheduleBuffer[i].isInProgress == false)
@@ -39,10 +53,12 @@ scheduler_error_code_e SchedulerAddOperation(void (*callback)(void), volatile ui
             entry.isInProgress = true;
             entry.isTimedOut = false;
             entry.callback = callback;
-            entry.timeFromNowMs = scheduler_current_time_ms + timeMsFromNow;
+            entry.timePeriodMs = timeMsFromNow;
+            entry.triggerTime = scheduler_current_time_ms + timeMsFromNow;
             entry.isCyclic = isCyclic;
             memcpy(&_scheduleBuffer[i], &entry, sizeof(scheduler_entry_t));
-            *taskIndex = i;
+            if (taskIndex != NULL)
+                *taskIndex = i;
             return E_SCHEDULER_OK;
         }
     }
@@ -62,11 +78,11 @@ scheduler_error_code_e ScheduleExecutePendingOperations()
     {
         if (_scheduleBuffer[i].isInProgress == true && _scheduleBuffer[i].isTimedOut == true)
         {
-            _scheduleBuffer[i].callback();
             if (_scheduleBuffer[i].isCyclic == false)
             {
                 _scheduleBuffer[i].isInProgress = false;
             }
+            _scheduleBuffer[i].callback();
         }
     }
 

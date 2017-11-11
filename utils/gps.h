@@ -85,7 +85,7 @@ typedef struct
     uint16_t            altitude;
     uint16_t            azimuth;
     uint16_t            speed;
-    uint16_t            acceleration;
+    int16_t             acceleration;
     uint32_t            timestamp;
 
 }gps_sample_t;

@@ -7,7 +7,6 @@
  */
 
 #include "crypto.h"
-#include "Systick.h"
 #include <stdint-gcc.h>
 #include <stdbool.h>
 #include <limits.h>
@@ -16,6 +15,7 @@
 #include "internal_flash.h"
 #include <string.h>
 #include <malloc.h>
+#include "RTC.h"
 
 uint8_t currentInitialisingVector[CRYPTO_KEY_SIZE];
 uint8_t mainEncryptionKey[CRYPTO_KEY_SIZE];
@@ -45,7 +45,7 @@ uint32_t CryptoGenerateKey(uint8_t* generatedKey, uint8_t* generatedKeySize)
     while (availableBytes < CRYPTO_KEY_SIZE)
     {
         sd_rand_application_bytes_available_get(&availableBytes);
-        SystickDelayMs(1);
+        Rtc1DelayMs(1);
     }
 
     *generatedKeySize = CRYPTO_KEY_SIZE;

@@ -44,7 +44,7 @@ void GPIOTE_IRQHandler()
 
         if (ImuIsWakeUpIRQ())
         {
-            nrf_gpio_pin_clear(DEBUG_2_PIN_PIN);
+            nrf_gpio_pin_clear(DEBUG_ORANGE_LED_PIN);
             TaskStartNewTrack();
         }
     }

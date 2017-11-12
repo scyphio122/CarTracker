@@ -10,8 +10,8 @@
 
 /** ######## DEBUG PINS ######## **/
 #define TRACE_SWO_PIN_PIN       (uint8_t)(18)
-#define DEBUG_1_PIN_PIN         (uint8_t)(22)
-#define DEBUG_2_PIN_PIN         (uint8_t)(23)
+#define DEBUG_RED_LED_PIN         (uint8_t)(22)
+#define DEBUG_ORANGE_LED_PIN    (uint8_t)(23)
 
 /**< ########### UART ############# **/
 #define UART_RX_PIN 	        (uint8_t)29

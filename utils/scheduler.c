@@ -17,11 +17,11 @@ volatile uint32_t scheduler_current_time_ms;
 
 scheduler_error_code_e SchedulerCheckOperations()
 {
-    scheduler_current_time_ms++;
+    scheduler_current_time_ms += 10;
     for (uint8_t i=0; i< SCHEDULER_BUFFER_SIZE; ++i)
     {
         if (_scheduleBuffer[i].isInProgress == true &&
-            _scheduleBuffer[i].triggerTime == scheduler_current_time_ms)
+            _scheduleBuffer[i].triggerTime <= scheduler_current_time_ms)
         {
             // If it is cyclic task - reschedule the next cycle
             if (_scheduleBuffer[i].isCyclic)
@@ -83,6 +83,7 @@ scheduler_error_code_e ScheduleExecutePendingOperations()
                 _scheduleBuffer[i].isInProgress = false;
             }
             _scheduleBuffer[i].callback();
+            _scheduleBuffer[i].isTimedOut = false;
         }
     }
 

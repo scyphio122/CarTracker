@@ -15,7 +15,6 @@
 #include <stdlib.h>
 #include "RTC.h"
 #include "parsing_utils.h"
-#include "Systick.h"
 
 gps_sample_t gpsLastSample;
 
@@ -67,7 +66,7 @@ void GpsPowerOn()
 {
     gsm_error_e err = GSM_OK;
     GsmUartSendCommand(AT_GPS_POWER_ON, sizeof(AT_GPS_POWER_ON), NULL);
-    SystickDelayMs(10);
+    Rtc1DelayMs(10);
 }
 
 void GpsPowerOff()
@@ -115,7 +114,7 @@ void GpsAgpsTrigger()
         break;
     }
 
-    SystickDelayMs(200);
+    Rtc1DelayMs(200);
     } while(*answer != 1);
 
     GpsEnableEPO();

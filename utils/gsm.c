@@ -13,7 +13,6 @@
 #include "pinout.h"
 #include "UART.h"
 #include <stdint-gcc.h>
-#include "Systick.h"
 #include "fifo.h"
 #include "internal_flash.h"
 #include "internal_memory_organization.h"
@@ -74,7 +73,7 @@ static void _GsmWaitForInitStart()
         index += 2;
         if (index != NULL && (*index != '3'))
         {
-            SystickDelayMs(100);
+            Rtc1DelayMs(100);
             continue;
         }
         else
@@ -100,6 +99,9 @@ void GsmGpsInit()
 
     GsmBatteryOn();
 
+
+
+
     UartConfig(UART_BAUDRATE_BAUDRATE_Baud115200,
                UART_CONFIG_PARITY_Excluded,
                UART_CONFIG_HWFC_Disabled);
@@ -120,7 +122,7 @@ void GsmGpsInit()
         // Block command echo
         while (GsmUartSendCommand("ATE0", sizeof("ATE0"), NULL) != GSM_OK)
         {
-            SystickDelayMs(10);
+            Rtc1DelayMs(10);
         }
 
         // Set error rerturn val to verbose string
@@ -170,7 +172,8 @@ void GsmBatteryOn()
     // VBAT on
     nrf_gpio_cfg_output(GSM_ENABLE_PIN);
     nrf_gpio_pin_clear(GSM_ENABLE_PIN);
-    SystickDelayMs(100);
+
+    Rtc1DelayMs(100);
 }
 
 void GsmBatteryOff()
@@ -182,7 +185,7 @@ void GsmPowerOn(bool waitForLogon)
 {
     // PWRKEY sequence
     nrf_gpio_pin_set(GSM_PWRKEY_PIN);
-    SystickDelayMs(2000);
+    Rtc1DelayMs(2000);
     nrf_gpio_pin_clear(GSM_PWRKEY_PIN);
 
     if (waitForLogon)
@@ -192,9 +195,9 @@ void GsmPowerOn(bool waitForLogon)
 void GsmPowerOff()
 {
     nrf_gpio_pin_set(GSM_PWRKEY_PIN);
-    SystickDelayMs(1000);
+    Rtc1DelayMs(1000);
     nrf_gpio_pin_clear(GSM_PWRKEY_PIN);
-    SystickDelayMs(1000);
+    Rtc1DelayMs(1000);
 }
 
 gsm_error_e GsmUartSendCommand(void* command, uint16_t commandSize, char* response)
@@ -280,7 +283,7 @@ gsm_error_e GsmUartSendCommandWithDifferentResponse(void* command, uint16_t comm
 
     if (error != NULL)
     {
-        SystickDelayMs(5000);
+        Rtc1DelayMs(5000);
     }
 
     UartRxStop();
@@ -410,7 +413,7 @@ void GsmSynchronizeTime()
         buf++;
         if (*buf == '\"')
         {
-            SystickDelayMs(100);
+            Rtc1DelayMs(100);
             continue;
         }
 
@@ -427,9 +430,9 @@ void GsmSynchronizeTime()
 static gsm_error_e _GsmSwitchBackToAtMode()
 {
     gsm_error_e err = GSM_OK;
-    SystickDelayMs(500);
+    Rtc1DelayMs(500);
     err = GsmUartSendCommand("+++", 3, NULL);
-    SystickDelayMs(500);
+    Rtc1DelayMs(500);
 
     return err;
 }

@@ -17,6 +17,8 @@
 #include "file_system.h"
 #include "ble_central.h"
 #include "lsm6dsm.h"
+#include "pinout.h"
+#include "nrf_gpio.h"
 
 volatile int8_t     imuMovementCheckTaskId = -1;
 volatile int8_t     gpsSamplingTaskId = -1;
@@ -30,9 +32,11 @@ volatile uint32_t   gpsSamplingPeriodMs = 10 * 1000;
 volatile uint32_t   alarmTimeoutMs  = 60 * 1000;
 volatile uint32_t   alarmSmsPeriodMs = 10 * 60 * 1000;
 
+volatile uint8_t    gpsStopSamplesCount = 0;
+
 void TaskStartCarMovementDetection()
 {
-    SchedulerAddOperation(TaskCarMovementDetectionCheck, 10000, &imuMovementCheckTaskId, true);
+    SchedulerAddOperation(TaskCarMovementDetectionCheck, 5000, &imuMovementCheckTaskId, true);
 }
 
 void TaskCarMovementDetectionCheck()
@@ -40,6 +44,7 @@ void TaskCarMovementDetectionCheck()
     // If the car movement was detected, then schedule the start new track task as soon as possible
     if (ImuIsWakeUpIRQ())
     {
+        nrf_gpio_pin_clear(DEBUG_RED_LED_PIN);
         SchedulerCancelOperation(&imuMovementCheckTaskId);
         SchedulerAddOperation(TaskStartNewTrack, 0, NULL, false);
     }
@@ -49,13 +54,16 @@ void TaskStartNewTrack()
 {
     if (!isTrackInProgress)
     {
+        gpsStopSamplesCount = 0;
+
+        GpsPowerOn();
         ImuDisableWakeUpIRQ();
-        TaskScanForKeyTag();
-        Mem_Org_Track_Start_Storage();
+//        TaskScanForKeyTag();
+//        Mem_Org_Track_Start_Storage();
         SubtaskStartTrackAssessment();
-        SchedulerAddOperation(TaskAlarmTimeout, alarmTimeoutMs, &alarmTimeoutTaskId, false);
+//        SchedulerAddOperation(TaskAlarmTimeout, alarmTimeoutMs, &alarmTimeoutTaskId, false);
         SchedulerAddOperation(TaskGpsGetSample, gpsSamplingPeriodMs, &gpsSamplingTaskId, true);
-        GsmHttpSendStartTrack();
+//        GsmHttpSendStartTrack();
         isTrackInProgress = true;
     }
 }
@@ -107,7 +115,26 @@ void TaskGpsGetSample(void)
     memset(&gpsLastSample, 0, sizeof(gpsLastSample));
     GpsRequestMessage(GPS_MSG_GGA);
     GpsRequestMessage(GPS_MSG_VTG);
-    gpsLastSample.acceleration = SubtaskGetAcceleration();
+
+    if (gpsLastSample.fixStatus != GPS_FIX_NO_FIX &&
+            gpsLastSample.fixStatus != 0)
+    {
+        nrf_gpio_pin_set(DEBUG_RED_LED_PIN);
+        nrf_gpio_pin_clear(DEBUG_ORANGE_LED_PIN);
+    }
+
+    if (gpsLastSample.speed < 150)
+    {
+        gpsStopSamplesCount++;
+    }
+
+    if (gpsStopSamplesCount >= 3)
+    {
+        TaskEndCurrentTrack();
+        return;
+    }
+
+//    gpsLastSample.acceleration = SubtaskGetAcceleration();
 
     GsmHttpSendSample(&gpsLastSample);
 //    Mem_Org_Store_Sample();
@@ -163,12 +190,18 @@ void SubtaskStopTrackAssessment()
 
 void TaskEndCurrentTrack()
 {
-    Mem_Org_Track_Stop_Storage();
+//    Mem_Org_Track_Stop_Storage();
+    GsmPowerOff();
     SchedulerCancelOperation(&gpsSamplingTaskId);
     SubtaskStopTrackAssessment();
     ImuEnableWakeUpIRQ();
 
     GsmHttpEndTrack();
+
     isTrackInProgress = false;
+
+    nrf_gpio_pin_set(DEBUG_RED_LED_PIN);
+    nrf_gpio_pin_set(DEBUG_ORANGE_LED_PIN);
+
 }
 

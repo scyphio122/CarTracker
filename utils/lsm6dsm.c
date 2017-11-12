@@ -11,7 +11,6 @@
 #include <stdint-gcc.h>
 #include <stdbool.h>
 #include "internal_flash.h"
-#include "Systick.h"
 #include <string.h>
 #include "arm_math.h"
 #include "RTC.h"
@@ -49,7 +48,7 @@ void ImuInit()
 void ImuTurnOn()
 {
     nrf_gpio_pin_clear(ACC_ENABLE_PIN);
-    SystickDelayMs(15);
+    Rtc1DelayMs(15);
 
     ImuInitSoftware();
 
@@ -285,7 +284,7 @@ void ImuEnableWakeUpIRQ()
 {
     uint8_t reg = 0;
     ImuReadRegister(TAP_CFG_REG, &reg, sizeof(reg));
-    reg |=  TAP_CFG_FUNC_IRQ_EN;
+    reg |=  TAP_CFG_FUNC_IRQ_EN | TAP_CFG_FUNC_IRQ_LATCH;
     ImuWriteRegister(TAP_CFG_REG, &reg, sizeof(reg));
 
 
@@ -307,7 +306,7 @@ bool ImuIsWakeUpIRQ()
 
     ImuReadRegister(WAKE_UP_SRC_REG, &reg, sizeof(reg));
 
-    reg &= 0x0F;
+    reg &= 0x08;
 
     if (reg > 0)
         return true;
@@ -357,7 +356,7 @@ void ImuConfigureIrqPinState(uint8_t irq_pin_state_)
 void ImuConfigureWakeUpIRQ()
 {
     ImuSetWakeUpIrqThreshold(WAKEUP_ACC_THRESHOLD);//);
-    ImuSetWakeUpIrqTriggerSamplesCount(0);
+    ImuSetWakeUpIrqTriggerSamplesCount(2);
 
     ImuEnableWakeUpIRQ();
 
@@ -365,6 +364,8 @@ void ImuConfigureWakeUpIRQ()
 
     ImuConfigureIrqPinState(IMU_IRQ_PIN_STATE_HI_TO_LO);
 
+    // Just to discard the first sample
+    ImuIsWakeUpIRQ();
 //    ImuSetWakeUpIntPin(1);
 
     ImuSetWakeUpIntPin(2);
@@ -514,12 +515,12 @@ uint16_t ImuFifoGetAllSamples(imu_sample_set_t* optionalSampleArray, uint16_t op
 
     _imuSamplesCount = 0;
 
-    nrf_gpio_pin_set(DEBUG_2_PIN_PIN);
+    nrf_gpio_pin_set(DEBUG_ORANGE_LED_PIN);
     for(_imuSamplesCount=0; _imuSamplesCount<samplesCount; ++_imuSamplesCount)
     {
         ImuFifoReadSingleSampleFromFifo(optionalSampleArray);
     }
-    nrf_gpio_pin_clear(DEBUG_2_PIN_PIN);
+    nrf_gpio_pin_clear(DEBUG_ORANGE_LED_PIN);
 
     return samplesCount;
 }
@@ -566,12 +567,12 @@ int32_t ImuCalculateMeanValue(void* vector, uint32_t vectorSize, uint8_t wordLen
 
 int32_t ImuGetMeanResultantAccelerationValueFromReadSamples()
 {
-    nrf_gpio_pin_set(DEBUG_1_PIN_PIN);
+    nrf_gpio_pin_set(DEBUG_RED_LED_PIN);
     int32_t meanAxisX = ImuCalculateMeanValue(_imuAccelerometerAxisX, _imuSamplesCount, sizeof(int16_t));
     int32_t meanAxisY = ImuCalculateMeanValue(_imuAccelerometerAxisY, _imuSamplesCount, sizeof(int16_t));
     int32_t meanAxisZ = ImuCalculateMeanValue(_imuAccelerometerAxisZ, _imuSamplesCount, sizeof(int16_t));
     int32_t totalAcc = ImuCalculateResultantVector3DLength(meanAxisX, meanAxisY, meanAxisZ);
-    nrf_gpio_pin_clear(DEBUG_1_PIN_PIN);
+    nrf_gpio_pin_clear(DEBUG_RED_LED_PIN);
 
     return totalAcc;
 }

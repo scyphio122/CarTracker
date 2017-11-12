@@ -63,7 +63,7 @@ void TaskStartNewTrack()
         SubtaskStartTrackAssessment();
 //        SchedulerAddOperation(TaskAlarmTimeout, alarmTimeoutMs, &alarmTimeoutTaskId, false);
         SchedulerAddOperation(TaskGpsGetSample, gpsSamplingPeriodMs, &gpsSamplingTaskId, true);
-//        GsmHttpSendStartTrack();
+        GsmHttpSendStartTrack();
         isTrackInProgress = true;
     }
 }
@@ -123,12 +123,24 @@ void TaskGpsGetSample(void)
         nrf_gpio_pin_clear(DEBUG_ORANGE_LED_PIN);
     }
 
+
     if (gpsLastSample.speed < 150)
     {
         gpsStopSamplesCount++;
     }
+    else
+    {
+        gpsStopSamplesCount = 0;
+    }
 
-    if (gpsStopSamplesCount >= 3)
+    // Store the only the first zero-speed sample
+    if (gpsStopSamplesCount <= 1)
+    {
+        GsmHttpSendSample(&gpsLastSample);
+    }
+
+
+    if (gpsStopSamplesCount >= 6)
     {
         TaskEndCurrentTrack();
         return;
@@ -136,7 +148,6 @@ void TaskGpsGetSample(void)
 
 //    gpsLastSample.acceleration = SubtaskGetAcceleration();
 
-    GsmHttpSendSample(&gpsLastSample);
 //    Mem_Org_Store_Sample();
 }
 
@@ -191,7 +202,7 @@ void SubtaskStopTrackAssessment()
 void TaskEndCurrentTrack()
 {
 //    Mem_Org_Track_Stop_Storage();
-    GsmPowerOff();
+    GpsPowerOff();
     SchedulerCancelOperation(&gpsSamplingTaskId);
     SubtaskStopTrackAssessment();
     ImuEnableWakeUpIRQ();

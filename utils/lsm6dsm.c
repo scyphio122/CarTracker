@@ -567,12 +567,10 @@ int32_t ImuCalculateMeanValue(void* vector, uint32_t vectorSize, uint8_t wordLen
 
 int32_t ImuGetMeanResultantAccelerationValueFromReadSamples()
 {
-    nrf_gpio_pin_set(DEBUG_RED_LED_PIN);
     int32_t meanAxisX = ImuCalculateMeanValue(_imuAccelerometerAxisX, _imuSamplesCount, sizeof(int16_t));
     int32_t meanAxisY = ImuCalculateMeanValue(_imuAccelerometerAxisY, _imuSamplesCount, sizeof(int16_t));
     int32_t meanAxisZ = ImuCalculateMeanValue(_imuAccelerometerAxisZ, _imuSamplesCount, sizeof(int16_t));
     int32_t totalAcc = ImuCalculateResultantVector3DLength(meanAxisX, meanAxisY, meanAxisZ);
-    nrf_gpio_pin_clear(DEBUG_RED_LED_PIN);
 
     return totalAcc;
 }

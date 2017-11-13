@@ -138,7 +138,8 @@ NRF_CLOCK->TRACECONFIG = 0;
 
     GsmGpsInit();
 
-    GpsAgpsTrigger();
+//    GpsAgpsTrigger();
+    GpsPowerOn();
 
 	ImuInit();
 	ImuTurnOn();
@@ -149,6 +150,8 @@ NRF_CLOCK->TRACECONFIG = 0;
     {
         CryptoGenerateAndStoreMainKey();
     }
+
+    ImuIsWakeUpIRQ();
 
 	TaskStartCarMovementDetection();
 

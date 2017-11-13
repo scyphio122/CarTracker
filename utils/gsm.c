@@ -202,7 +202,7 @@ void GsmPowerOff()
 
 gsm_error_e GsmUartSendCommand(void* command, uint16_t commandSize, char* response)
 {
-    static uint8_t cmd[32];
+    static uint8_t cmd[256];
     char* success = NULL;
     char* error = NULL;
     uint8_t timeoutId = 0;
@@ -225,6 +225,10 @@ gsm_error_e GsmUartSendCommand(void* command, uint16_t commandSize, char* respon
     }while(success == NULL && error == NULL && rtcTimeoutArray[timeoutId].timeoutTriggeredFlag == false);
 
     RTCClearTimeout(NRF_RTC1, timeoutId);
+    if (error != NULL)
+    {
+        RTCDelay(NRF_RTC1, RTC1_MS_TO_TICKS(10));
+    }
 
     UartRxStop();
     UartDisable();

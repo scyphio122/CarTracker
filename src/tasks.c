@@ -19,6 +19,7 @@
 #include "lsm6dsm.h"
 #include "pinout.h"
 #include "nrf_gpio.h"
+#include "RTC.h"
 
 volatile int8_t     imuMovementCheckTaskId = -1;
 volatile int8_t     gpsSamplingTaskId = -1;
@@ -56,7 +57,6 @@ void TaskStartNewTrack()
     {
         gpsStopSamplesCount = 0;
 
-        GpsPowerOn();
         ImuDisableWakeUpIRQ();
 //        TaskScanForKeyTag();
 //        Mem_Org_Track_Start_Storage();
@@ -115,22 +115,27 @@ void TaskGpsGetSample(void)
     memset(&gpsLastSample, 0, sizeof(gpsLastSample));
     GpsRequestMessage(GPS_MSG_GGA);
     GpsRequestMessage(GPS_MSG_VTG);
+    gpsLastSample.timestamp = RtcGetTimestamp();
 
     if (gpsLastSample.fixStatus != GPS_FIX_NO_FIX &&
             gpsLastSample.fixStatus != 0)
     {
         nrf_gpio_pin_set(DEBUG_RED_LED_PIN);
         nrf_gpio_pin_clear(DEBUG_ORANGE_LED_PIN);
+        return;
     }
 
 
-    if (gpsLastSample.speed < 150)
+    if (gpsLastSample.speed < 150 &&
+        gpsLastSample.fixStatus != 0 &&
+        gpsLastSample.fixStatus != GPS_FIX_NO_FIX)
     {
         gpsStopSamplesCount++;
     }
     else
     {
         gpsStopSamplesCount = 0;
+        return;
     }
 
     // Store the only the first zero-speed sample
@@ -202,10 +207,11 @@ void SubtaskStopTrackAssessment()
 void TaskEndCurrentTrack()
 {
 //    Mem_Org_Track_Stop_Storage();
-    GpsPowerOff();
+//    GpsPowerOff();
     SchedulerCancelOperation(&gpsSamplingTaskId);
     SubtaskStopTrackAssessment();
     ImuEnableWakeUpIRQ();
+    TaskStartCarMovementDetection();
 
     GsmHttpEndTrack();
 

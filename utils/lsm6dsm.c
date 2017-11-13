@@ -356,7 +356,7 @@ void ImuConfigureIrqPinState(uint8_t irq_pin_state_)
 void ImuConfigureWakeUpIRQ()
 {
     ImuSetWakeUpIrqThreshold(WAKEUP_ACC_THRESHOLD);//);
-    ImuSetWakeUpIrqTriggerSamplesCount(2);
+    ImuSetWakeUpIrqTriggerSamplesCount(1);
 
     ImuEnableWakeUpIRQ();
 
@@ -365,10 +365,11 @@ void ImuConfigureWakeUpIRQ()
     ImuConfigureIrqPinState(IMU_IRQ_PIN_STATE_HI_TO_LO);
 
     // Just to discard the first sample
-    ImuIsWakeUpIRQ();
+
 //    ImuSetWakeUpIntPin(1);
 
     ImuSetWakeUpIntPin(2);
+
 }
 
 

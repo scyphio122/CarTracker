@@ -56,19 +56,17 @@ static void GpsParseLongtitude(char* coordinate, gps_coord_t* outCoord)
     outCoord->seconds = _atoi(coordinate + 6, 4);
 }
 
+void GpsStringifyCoord(gps_coord_t* coord, char* buf)
+{
+    //                     ddd*mm.mmmmN\0
+    sprintf(buf, "%d*%d.%d%c", coord->degrees, coord->minutes, coord->seconds, coord->hemisphereDescriptor);
+}
+
 void GpsPowerOn()
 {
     gsm_error_e err = GSM_OK;
-    nrf_gpio_cfg_input(GPS_ENABLE_PIN, NRF_GPIO_PIN_PULLUP);
-    uint8_t state = nrf_gpio_pin_read(GPS_ENABLE_PIN);
-    GsmUartSendCommand(AT_GPS_POWER_READ, sizeof(AT_GPS_POWER_READ), NULL);
     GsmUartSendCommand(AT_GPS_POWER_ON, sizeof(AT_GPS_POWER_ON), NULL);
-    GsmUartSendCommand(AT_GPS_POWER_READ, sizeof(AT_GPS_POWER_READ), NULL);
-
-    while (nrf_gpio_pin_read(GPS_ENABLE_PIN) == 0)
-    {
-
-    }
+    Rtc1DelayMs(10);
 }
 
 void GpsPowerOff()
@@ -76,20 +74,77 @@ void GpsPowerOff()
     GsmUartSendCommand(AT_GPS_POWER_OFF, sizeof(AT_GPS_POWER_OFF), NULL);
 }
 
-void GpsDisableEPO()
+static void GpsDisableEPO()
 {
     GsmUartSendCommand(AT_GPS_EPO_DISABLE, sizeof(AT_GPS_EPO_DISABLE), NULL);
 }
 
-void GpsEnableEPO()
+static void GpsEnableEPO()
 {
     GsmUartSendCommand(AT_GPS_EPO_ENABLE, sizeof(AT_GPS_EPO_ENABLE), NULL);
+}
+
+static void GpsTriggerEPO()
+{
+    GsmUartSendCommand(AT_GPS_EPO_EXECUTE, sizeof(AT_GPS_EPO_EXECUTE), NULL);
+}
+
+void GpsAgpsTrigger()
+{
+    char response[32];
+    char* answer = NULL;
+
+    memset(response, 0, sizeof(response));
+
+    // Configure context 2 for PDP - EPO uses only context 2
+    GsmUartSendCommand("AT+QIFGCNT=2", sizeof("AT+QIFGCNT=2"), NULL);
+    // Configure APN
+    GsmUartSendCommand("AT+QICSGP=1,\"internet\"", sizeof("AT+QICSGP=1,\"internet\""), NULL);
+
+    do
+    {
+    // Check if GNSS has time synchronized with GSM
+    GsmUartSendCommand("AT+QGNSSTS?", sizeof("AT+QGNSSTS?"), response);
+
+    // Get the pointer to the answer number
+    answer = strstr(response, " ");
+    answer++;
+    if (*answer == '1')
+    {
+        break;
+    }
+
+    Rtc1DelayMs(200);
+    } while(*answer != 1);
+
+    GpsEnableEPO();
+    GpsTriggerEPO();
+}
+
+void GpsSetReferencePosition(gps_coord_t* latitude, gps_coord_t* longitude)
+{
+    char _latitude[16];
+    char _longtitude[16];
+    char cmd[64];
+
+    memset(_latitude, 0, sizeof(_latitude));
+    memset(_longtitude, 0, sizeof(_longtitude));
+    memset(cmd, 0 , sizeof(cmd));
+
+    sprintf(_latitude, "%d.%d%d", latitude->degrees, latitude->minutes, latitude->seconds);
+    sprintf(_longtitude, "%d.%d%d", longitude->degrees, longitude->minutes, longitude->seconds);
+
+    sprintf(cmd, "%s=%s,%s", AT_GPS_SET_REF_LOCATION, _latitude, _longtitude);
+
+    GsmUartSendCommand(cmd, strlen(cmd) + 1, NULL);
 }
 
 void GpsGetData()
 {
     GsmUartSendCommand(AT_GPS_GET_NAVI_DATA, sizeof(AT_GPS_GET_NAVI_DATA), NULL);
 }
+
+
 
 void GpsRequestMessage(gps_message_type_e msgType)
 {

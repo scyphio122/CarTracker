@@ -342,23 +342,24 @@ void NfcIrqCallback()
 
 void NfcTransferData(uint8_t* data, uint8_t dataSize)
 {
-    if (dataSize > sizeof(_nfcWriteFifoBuffer))
-    {
-        while(1)
-        {
-            __WFE();
-        }
-    }
+    // Clear the necessary bits
+    uint8_t command = NFC_TX_WITH_CRC_COMMAND;
+    // Mark the data as command
+    command |= 0x80;
 
-    FifoClear(&nfcWriteFifo);
-    memcpy(_nfcWriteFifoBuffer, data, dataSize);
-    _txInProgress = true;
+    char _cmd[2];
+    _cmd[0] = command;
+    _cmd[0] = dataSize;
 
-    for (uint8_t i=0; (i<dataSize && i<12); ++i)
-    {
-        uint8_t data = 0;
-        FifoGet(&nfcWriteFifo, &data);
-        NfcWriteRegister(NFC_FIFO_ADDRESS + i, data);
-    }
+    SpiSwitchPolarityPhase(NFC_SPI_PERIPH, SPI_CONFIG_CPOL_ActiveHigh, SPI_CONFIG_CPHA_Leading);
+    SpiEnable(NFC_SPI_PERIPH);
+    SpiCSAssert(NFC_CS_PIN);
+
+    SpiWrite(NFC_SPI_PERIPH, _cmd, sizeof(_cmd));
+
+    SpiWrite(NFC_SPI_PERIPH, data, dataSize);
+
+    SpiCSDeassert(NFC_CS_PIN);
+    SpiDisable(NFC_SPI_PERIPH);
 }
 

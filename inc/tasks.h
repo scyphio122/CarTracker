@@ -8,20 +8,32 @@
 #ifndef INC_TASKS_H_
 #define INC_TASKS_H_
 
-void TaskScanForKeyTag();
+#include <stdint-gcc.h>
 
-void TaskGpsGetSample();
+void TaskStartCarMovementDetection();
 
-void TaskAlarmSendLocation();
+void TaskCarMovementDetectionCheck();
 
-void TaskAlarmTimeout();
+void TaskStartNewTrack();
 
 void TaskDeactivateAlarm();
 
 void TaskAbortAlarm();
 
-void TaskStartNewTrack();
+void TaskGpsGetSample();
+
+void TaskScanForKeyTag();
+
+void TaskAlarmSendLocation();
+
+void TaskAlarmTimeout();
 
 void TaskEndCurrentTrack();
+
+void SubtaskStartTrackAssessment();
+
+int16_t SubtaskGetAcceleration();
+
+void SubtaskStopTrackAssessment();
 
 #endif /* INC_TASKS_H_ */

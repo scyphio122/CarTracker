@@ -63,6 +63,12 @@
 #define AT_GSM_SEND_SMS_MESSAGE             "AT+CMGS="
 
 
+#define AT_GSM_HTTP_URL                     "AT+QHTTPURL="
+#define AT_GSM_HTTP_GET                     "AT+QHTTPGET="
+#define AT_GSM_HTTP_READ_SERVER_RESPONSE    "AT+QHTTPREAD"
+#define AT_GSM_HTTP_POST                    "AT+QHTTPPOST="
+
+
 /** -------------------------------------------------------- GPS COMMANDS ------------------------------------------------------------------ */
 
 #define AT_GPS_POWER_READ                   "AT+QGNSSC?"
@@ -86,6 +92,6 @@
 #define AT_GPS_GET_TIME_SYNC_STATUS         "AT+QGNSSTS?"
 
 /** Set reference localization (last known localization) to decrease TTFF **/
-#define AT_GPS_SET_REF_LOCATION(lat, lng)   "AT+QGREFLOC=" lat "," lng
+#define AT_GPS_SET_REF_LOCATION             "AT+QGREFLOC"
 
 #endif /* UTILS_AT_COMMANDS_H_ */

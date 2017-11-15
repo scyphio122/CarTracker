@@ -20,7 +20,8 @@ typedef enum
 
 typedef struct
 {
-    uint32_t    timeFromNowMs;
+    uint32_t    triggerTime;
+    uint32_t    timePeriodMs;
     void        (*callback)(void);
     bool        isTimedOut;
     bool        isInProgress;

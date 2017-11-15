@@ -12,6 +12,7 @@
 #include "stdlib.h"
 #include <stdint-gcc.h>
 #include <time.h>
+#include "scheduler.h"
 
 #define DELAY_REGISTER_MAIN			0
 #define	TIMEOUT_REGISTER_MAIN 		1
@@ -32,8 +33,16 @@ void RTC0_IRQHandler()
 }
 #endif
 
+
 void RTC1_IRQHandler()
 {
+    if (NRF_RTC1->EVENTS_TICK)
+    {
+        NRF_RTC1->EVENTS_TICK = 0;
+
+        SchedulerCheckOperations();
+    }
+
 	if (NRF_RTC1->EVENTS_COMPARE[DELAY_REGISTER_MAIN])			/*< RTC DELAY */
 	{
 		NRF_RTC1->EVENTS_COMPARE[DELAY_REGISTER_MAIN] = 0;
@@ -70,6 +79,13 @@ void RTC1_IRQHandler()
 
 void RTC2_IRQHandler()
 {
+    if (NRF_RTC2->EVENTS_TICK)
+    {
+        NRF_RTC2->EVENTS_TICK = 0;
+
+        SchedulerCheckOperations();
+    }
+
 	if (NRF_RTC2->EVENTS_COMPARE[DELAY_REGISTER_MAIN])			/*< RTC DELAY */
 	{
 		NRF_RTC2->EVENTS_COMPARE[DELAY_REGISTER_MAIN] = 0;
@@ -126,6 +142,16 @@ RTC_Error_e RTCDelay(NRF_RTC_Type* RTC, uint32_t time_ticks)
 	return E_RTC_OK;
 }
 
+RTC_Error_e Rtc1DelayMs(uint32_t ms)
+{
+    return RTCDelay(NRF_RTC1, RTC1_MS_TO_TICKS(ms));
+}
+
+RTC_Error_e Rtc2DelayMs(uint32_t ms)
+{
+    return RTCDelay(NRF_RTC2, RTC1_MS_TO_TICKS(ms));
+}
+
 RTC_Error_e RTCTimeout(NRF_RTC_Type* RTC, uint32_t time_ticks, uint8_t* outTimeoutId)
 {
 	volatile bool* timoutFlag = NULL;
@@ -152,7 +178,6 @@ RTC_Error_e RTCClearTimeout(NRF_RTC_Type* RTC, uint8_t timeoutId)
 	if (RTC == NRF_RTC1)
 	{
 		rtcTimeoutArray[timeoutId].activeFlag = false;
-		rtcTimeoutArray[timeoutId].timeoutTriggeredFlag = false;
 		RTCDisableComparingReg(RTC, (timeoutId + 1));
 	}
 
@@ -175,12 +200,16 @@ RTC_Error_e RTCInit(NRF_RTC_Type* RTC)
 		sd_nvic_EnableIRQ(RTC1_IRQn);
 		NRF_RTC1->EVTENSET = RTC_EVTENSET_OVRFLW_Enabled << RTC_EVTENSET_OVRFLW_Pos;
 		NRF_RTC1->INTENSET = RTC_INTENSET_OVRFLW_Enabled << RTC_INTENSET_OVRFLW_Pos;
+	    RTC->EVTENCLR |= RTC_EVTENCLR_TICK_Enabled << RTC_EVTENCLR_TICK_Pos;
 	}
 
 	if (RTC == NRF_RTC2)
 	{
 		sd_nvic_SetPriority(RTC2_IRQn, RTC2_PRIORITY);
 		sd_nvic_EnableIRQ(RTC2_IRQn);
+
+        NRF_RTC2->EVTENSET = RTC_EVTENSET_TICK_Enabled << RTC_EVTENSET_TICK_Pos;
+        NRF_RTC2->INTENSET = RTC_INTENSET_TICK_Enabled << RTC_INTENSET_TICK_Pos;
 	}
 #else
 	if (RTC == NRF_RTC0)
@@ -204,7 +233,6 @@ RTC_Error_e RTCInit(NRF_RTC_Type* RTC)
 
 	RTCStop(RTC);
 
-	RTC->EVTENCLR |= RTC_EVTENCLR_TICK_Enabled << RTC_EVTENCLR_TICK_Pos;
 	RTC->EVTENCLR |= RTC_EVTENCLR_COMPARE0_Enabled << RTC_EVTENCLR_COMPARE0_Pos;
 	RTC->EVTENCLR |= RTC_EVTENCLR_COMPARE1_Enabled << RTC_EVTENCLR_COMPARE1_Pos;
 	RTC->EVTENCLR |= RTC_EVTENCLR_COMPARE2_Enabled << RTC_EVTENCLR_COMPARE2_Pos;

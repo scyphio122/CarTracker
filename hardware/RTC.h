@@ -28,7 +28,7 @@
 #define RTC1_S_TO_TICKS(time_s)     (time_s*RTC1_FREQUENCY)
 
 
-#define RTC2_PRESCALER				0
+#define RTC2_PRESCALER				327 // RTC2 Frequency = 99.9 Hz
 #define RTC2_FREQUENCY   			(32768/(RTC2_PRESCALER + 1))
 #define RTC2_MS_TO_TICKS(time_ms)	(time_ms*RTC2_FREQUENCY/1000)
 #define RTC2_US_TO_TICKS(time_us)	(time_us*RTC2_FREQUENCY/1000000)
@@ -76,6 +76,9 @@ RTC_Error_e RTCStart(NRF_RTC_Type* RTC);
 RTC_Error_e RTCStop(NRF_RTC_Type* RTC);
 
 RTC_Error_e RTCDelay(NRF_RTC_Type* RTC, uint32_t time_ticks);
+RTC_Error_e Rtc1DelayMs(uint32_t ms);
+RTC_Error_e Rtc2DelayMs(uint32_t ms);
+
 RTC_Error_e RTCTimeout(NRF_RTC_Type* RTC, uint32_t time_ticks, uint8_t* outTimeoutId);
 RTC_Error_e RTCClearTimeout(NRF_RTC_Type* RTC, uint8_t timeoutId);
 

@@ -85,7 +85,7 @@ typedef struct
     uint16_t            altitude;
     uint16_t            azimuth;
     uint16_t            speed;
-    uint16_t            acceleration;
+    int16_t             acceleration;
     uint32_t            timestamp;
 
 }gps_sample_t;
@@ -96,11 +96,13 @@ void GpsPowerOn();
 
 void GpsPowerOff();
 
-void GpsDisableEPO();
+void GpsSetReferencePosition(gps_coord_t* latitude, gps_coord_t* longitude);
 
-void GpsEnableEPO();
+void GpsAgpsTrigger();
 
 void GpsGetData();
+
+void GpsStringifyCoord(gps_coord_t* coord, char* buf);
 
 void GpsRequestMessage(gps_message_type_e msgType);
 

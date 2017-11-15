@@ -41,6 +41,9 @@
 #include "request_fifos.h"
 #include "file_system.h"
 #include "nfc.h"
+#include "lsm6dsm.h"
+#include "tasks.h"
+
 /*
  *
  * Print a greeting message on standard output and exit.
@@ -96,22 +99,26 @@ void InitDeviceData()
 {
     memcpy(&gsmDeviceNumber     , (uint32_t*)GSM_DEVICE_PHONE_NUMBER_ADDRESS   , sizeof(uint64_t));
     memcpy(&gsmOwnerDeviceNumber, (uint32_t*)GSM_OWNER_PHONE_NUMBER_ADDRESS    , sizeof(uint64_t));
-    memcpy(&deviceId            , (uint32_t*)DEVICE_ID                         , sizeof(uint32_t));
+//    memcpy(&deviceId            , (uint32_t*)DEVICE_ID                         , sizeof(uint32_t));
+    deviceId = 2;
     memcpy(mainEncryptionKey    , (uint32_t*)CRYPTO_MAIN_KEY_ADDRESS           , CRYPTO_KEY_SIZE);
 
 //    Mem_Org_Init();
 }
 
+
 __attribute__((optimize("O0")))
 int main(void)
 {
-    NRF_CLOCK->TRACECONFIG = 0;
+NRF_CLOCK->TRACECONFIG = 0;
 
 #if SOFTDEVICE_ENABLED
 	BleStackInit();
 
     RTCInit(NRF_RTC1);
-    SystickInit();
+    RTCInit(NRF_RTC2);
+
+//    SystickInit();
 
 	GapParamsInit();
 	GattInit();
@@ -124,92 +131,53 @@ int main(void)
 
 	InitDeviceData();
 
-//	AdvertisingStart();
-//    BleCentralScanStart();
-#endif
-//	nrf_gpio_cfg_output(DEBUG_1_PIN_PIN);
-//	nrf_gpio_pin_clear(DEBUG_1_PIN_PIN);
-//
-	nrf_gpio_cfg_output(DEBUG_2_PIN_PIN);
-	nrf_gpio_pin_clear(DEBUG_2_PIN_PIN);
-
-	ExtFlashInit();
-	ExtFlashTurnOff();
 
     NfcInit();
 
     NfcPowerOn();
-    SystickDelayMs(100);
-//    NfcTxRxFullPower();
-    NfcRxOnly();
+    NfcTxRxFullPower();
+
+    while (1)
+    {
+        NfcTransferData("Hello world!", 9);
+        Rtc1DelayMs(10);
+    }
+//    NfcRxOnly();
 
     while(1)
     {
         __WFE();
     }
 
-	GsmGpsInit();
-    GpioteInit();
+//	AdvertisingStart();
+//    BleCentralScanStart();
+#endif
 
+	nrf_gpio_cfg_output(DEBUG_RED_LED_PIN);
+	nrf_gpio_cfg_output(DEBUG_ORANGE_LED_PIN);
+	nrf_gpio_pin_set(DEBUG_RED_LED_PIN);
+	nrf_gpio_pin_set(DEBUG_ORANGE_LED_PIN);
+
+    GsmGpsInit();
+
+//    GpsAgpsTrigger();
+    GpsPowerOn();
+
+	ImuInit();
+	ImuTurnOn();
+    GpioteInit();
+    ImuFifoConfigure();
 
     if (!CryptoCheckMainKey())
     {
         CryptoGenerateAndStoreMainKey();
     }
-//
-	GpsPowerOn();
-
-//	do
-//	{
-// 	    GpsGetData();
-//	    SystickDelayMs(5000);
-//	}while (1);
 
 
-//	ExtFlashInit();
-//
-//    ExtFlashTurnOn(EXT_FLASH_PROGRAM_OP);
-//    uint8_t data[64] = "Litwo, Ojczyzno moja, Ty jestes jak zdrowie, Ten tylko sie dowie";
-//    uint8_t b[64];
-//    ExtFlashProgramPageThroughBufferWithoutPreerase(0x1000, data, 64);
-//    ExtFlashReadPage(0x1000, b, 64);
+    ImuIsWakeUpIRQ();
 
-    // Check if the Main Key exists
+	TaskStartCarMovementDetection();
 
-
-
-
-//    uint8_t dataEncrypted[64];
-//    uint8_t dataDecrypted[64];
-//    uint8_t iv[16];
-//    uint8_t ivSize;
-//
-//    CryptoGenerateKey((uint8_t*)iv, &ivSize);
-//    memset(dataEncrypted, 0, 64);
-////    ExtFlashProgramPageThroughBufferWithoutPreerase(0x30000, data, 64);
-//    IntFlashErasePage((uint32_t*)0x30000);
-////    uint8_t d[64];
-//
-////    ExtFlashReadPage(0x3000, d, 64);
-//
-//    uint32_t encryptStart = NRF_RTC1->COUNTER;
-//    CryptoCFBEncryptData(data, iv, (uint8_t*)CRYPTO_MAIN_KEY_ADDRESS, 16, dataEncrypted, 64);
-//    //CryptoEncryptData(data, 16, (uint8_t*)CRYPTO_MAIN_KEY_ADDRESS, 16, dataEncrypted);
-//    uint32_t encryptEnd = NRF_RTC1->COUNTER;
-//
-//    IntFlashUpdatePage(dataEncrypted, 64, (uint32_t*)0x30000);
-//
-//    memset(dataEncrypted, 0, 64);
-//    memset(dataDecrypted, 0, 64);
-//
-//    memcpy(dataEncrypted, (uint8_t*)0x30000, 64);
-//    uint32_t decryptStart = NRF_RTC1->COUNTER;
-//    CryptoCFBDecryptData(dataEncrypted, iv, (uint8_t*)CRYPTO_MAIN_KEY_ADDRESS, 16, dataDecrypted, 64);
-////    CryptoECBDecryptData(dataEncrypted, 16, (uint8_t*)CRYPTO_MAIN_KEY_ADDRESS, 16, dataDecrypted);
-//    uint32_t decryptEnd = NRF_RTC1->COUNTER;
-//
-//    uint32_t encryptTime = (encryptEnd - encryptStart);
-//    uint32_t decryptTime = decryptEnd - decryptStart;
 
 	while(1)
 	{

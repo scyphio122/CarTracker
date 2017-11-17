@@ -271,6 +271,13 @@ gps_error_e GpsParseMessageGGA(uint8_t* msgBuffer, uint16_t msgBufferSize)
 
            case HDOP:
            {
+               // Check existance of the dot
+               char* dotIndex = strstr(curField, ".");
+               if (dotIndex != NULL)
+               {
+                   gpsLastSample.hdop =  _atoi(curField, dotIndex - curField)*100;
+                   gpsLastSample.hdop += _atoi(dotIndex+1, 1)*41;
+               }
            }break;
 
            case ALTITUDE:
@@ -429,5 +436,7 @@ gps_error_e GpsParseMessageVTG(uint8_t* msgBuffer, uint16_t msgBufferSize)
         }
         fieldNumber++;
     }
+
+    return GPS_OK_E;
 }
 

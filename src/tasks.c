@@ -34,6 +34,7 @@ volatile uint32_t   alarmTimeoutMs  = 60 * 1000;
 volatile uint32_t   alarmSmsPeriodMs = 10 * 60 * 1000;
 
 volatile uint8_t    gpsStopSamplesCount = 0;
+volatile uint32_t   gpsTrackSamplesCount = 0;
 
 void TaskStartCarMovementDetection()
 {
@@ -48,6 +49,7 @@ void TaskCarMovementDetectionCheck()
         nrf_gpio_pin_clear(DEBUG_RED_LED_PIN);
         SchedulerCancelOperation(&imuMovementCheckTaskId);
         SchedulerAddOperation(TaskStartNewTrack, 0, NULL, false);
+        ImuFifoFlush();
     }
 }
 
@@ -63,7 +65,6 @@ void TaskStartNewTrack()
         SubtaskStartTrackAssessment();
 //        SchedulerAddOperation(TaskAlarmTimeout, alarmTimeoutMs, &alarmTimeoutTaskId, false);
         SchedulerAddOperation(TaskGpsGetSample, gpsSamplingPeriodMs, &gpsSamplingTaskId, true);
-        GsmHttpSendStartTrack();
         isTrackInProgress = true;
     }
 }
@@ -117,26 +118,35 @@ void TaskGpsGetSample(void)
     GpsRequestMessage(GPS_MSG_VTG);
     gpsLastSample.timestamp = RtcGetTimestamp();
 
-    if (gpsLastSample.fixStatus != GPS_FIX_NO_FIX &&
-            gpsLastSample.fixStatus != 0)
+    // If no fix is gathered - return;
+    if (gpsLastSample.fixStatus == 0 ||
+            gpsLastSample.fixStatus == GPS_FIX_NO_FIX)
     {
-        nrf_gpio_pin_set(DEBUG_RED_LED_PIN);
-        nrf_gpio_pin_clear(DEBUG_ORANGE_LED_PIN);
+        ImuFifoFlush();
         return;
     }
+    else
+    {
+        if (gpsTrackSamplesCount == 0)
+        {
+            nrf_gpio_pin_set(DEBUG_RED_LED_PIN);
+            nrf_gpio_pin_clear(DEBUG_ORANGE_LED_PIN);
+            GsmHttpSendStartTrack();
+        }
 
+        gpsTrackSamplesCount++;
+    }
 
-    if (gpsLastSample.speed < 150 &&
-        gpsLastSample.fixStatus != 0 &&
-        gpsLastSample.fixStatus != GPS_FIX_NO_FIX)
+    if (gpsLastSample.speed < 300)
     {
         gpsStopSamplesCount++;
     }
     else
     {
         gpsStopSamplesCount = 0;
-        return;
     }
+
+    gpsLastSample.acceleration = SubtaskGetAcceleration();
 
     // Store the only the first zero-speed sample
     if (gpsStopSamplesCount <= 1)
@@ -151,7 +161,6 @@ void TaskGpsGetSample(void)
         return;
     }
 
-//    gpsLastSample.acceleration = SubtaskGetAcceleration();
 
 //    Mem_Org_Store_Sample();
 }

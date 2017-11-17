@@ -536,7 +536,8 @@ int32_t ImuCalculateResultantVector3DLength(int16_t x, int16_t y, int16_t z)
     int32_t z_2 = z*z;
 
     int32_t result = 0;
-    arm_sqrt_q31(x_2 +y_2 + z_2, (q31_t*)&result);
+    int32_t sum = x_2 +y_2 + z_2;
+    arm_sqrt_q31(sum, (q31_t*)&result);
 
     return result;
 }
@@ -568,10 +569,10 @@ int32_t ImuCalculateMeanValue(void* vector, uint32_t vectorSize, uint8_t wordLen
 
 int32_t ImuGetMeanResultantAccelerationValueFromReadSamples()
 {
-    int32_t meanAxisX = ImuCalculateMeanValue(_imuAccelerometerAxisX, _imuSamplesCount, sizeof(int16_t));
-    int32_t meanAxisY = ImuCalculateMeanValue(_imuAccelerometerAxisY, _imuSamplesCount, sizeof(int16_t));
-    int32_t meanAxisZ = ImuCalculateMeanValue(_imuAccelerometerAxisZ, _imuSamplesCount, sizeof(int16_t));
-    int32_t totalAcc = ImuCalculateResultantVector3DLength(meanAxisX, meanAxisY, meanAxisZ);
+    int16_t meanAxisX = ImuCalculateMeanValue(_imuAccelerometerAxisX, _imuSamplesCount, sizeof(int16_t));
+    int16_t meanAxisY = ImuCalculateMeanValue(_imuAccelerometerAxisY, _imuSamplesCount, sizeof(int16_t));
+    int16_t meanAxisZ = ImuCalculateMeanValue(_imuAccelerometerAxisZ, _imuSamplesCount, sizeof(int16_t));
+    int16_t totalAcc = ImuCalculateResultantVector3DLength(meanAxisX, meanAxisY, meanAxisZ);
 
     return totalAcc;
 }

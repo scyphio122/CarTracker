@@ -266,7 +266,11 @@ gps_error_e GpsParseMessageGGA(uint8_t* msgBuffer, uint16_t msgBufferSize)
 
            case NUMBER_OF_SV:
            {
-               gpsLastSample.numOfSattelites = *curField;
+               char* dotIndex = strstr(curField, ",");
+               char satsNum[3];
+               memset(satsNum, 0, sizeof(satsNum));
+               memcpy(satsNum, curField, dotIndex - curField);
+               gpsLastSample.numOfSattelites = _atoi(curField, dotIndex - curField);
            }break;
 
            case HDOP:
@@ -276,7 +280,7 @@ gps_error_e GpsParseMessageGGA(uint8_t* msgBuffer, uint16_t msgBufferSize)
                if (dotIndex != NULL)
                {
                    gpsLastSample.hdop =  _atoi(curField, dotIndex - curField)*100;
-                   gpsLastSample.hdop += _atoi(dotIndex+1, 1)*41;
+                   gpsLastSample.hdop += _atoi(dotIndex+1, 2);
                }
            }break;
 

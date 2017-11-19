@@ -88,6 +88,7 @@ typedef struct
     uint16_t            speed;
     int16_t             acceleration;
     uint32_t            timestamp;
+    uint8_t             manouverAssessment;
 
 }gps_sample_t;
 

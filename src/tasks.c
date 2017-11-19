@@ -146,8 +146,8 @@ void TaskGpsGetSample(void)
         gpsStopSamplesCount = 0;
     }
 
-    gpsLastSample.acceleration = SubtaskGetAcceleration();
-
+    gpsLastSample.acceleration = 0;//SubtaskGetAcceleration();
+    gpsLastSample.manouverAssessment = 5;
     // Store the only the first zero-speed sample
     if (gpsStopSamplesCount <= 1)
     {

@@ -138,13 +138,15 @@ NRF_CLOCK->TRACECONFIG = 0;
 	nrf_gpio_pin_set(DEBUG_RED_LED_PIN);
 	nrf_gpio_pin_set(DEBUG_ORANGE_LED_PIN);
 
+    ImuInit();
+    ImuTurnOn();
+
     GsmGpsInit();
 
     GpsPowerOn();
     GpsAgpsTrigger();
 
-	ImuInit();
-	ImuTurnOn();
+
     GpioteInit();
     ImuFifoConfigure();
 

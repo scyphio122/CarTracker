@@ -10,7 +10,7 @@
 
 #include <stdint-gcc.h>
 #include <stdbool.h>
-
+#include <arm_math.h>
 
 
 #define CTRL1_ACCELEROMETER_RANGE_2g      ((uint8_t)0x00 << 2)
@@ -19,7 +19,7 @@
 #define CTRL1_ACCELEROMETER_RANGE_16g     ((uint8_t)0x01 << 2)
 
 #define IMU_SAMPLE_BUFFER_SIZE      512
-#define WAKEUP_ACC_THRESHOLD        2    //< About 0.3m/s^2 (Calculation: WAKEUP_ACC_THRESHOLD*19.62/64)
+#define WAKEUP_ACC_THRESHOLD        3    //< About 0.9m/s^2 (Calculation: WAKEUP_ACC_THRESHOLD*19.62/64 = 0.3066 m/s^2)
 
 #define FUNC_CFG_ACCESS_REG  0x01
 
@@ -273,7 +273,7 @@ void ImuFifoReadSingleSampleFromFifo(imu_sample_set_t* sample);
 uint16_t ImuFifoGetAllSamples(imu_sample_set_t* optionalSampleArray, uint16_t optionalSampleArraySize);
 
 
-int32_t ImuCalculateResultantVector3DLength(int16_t x, int16_t y, int16_t z);
+float32_t ImuCalculateResultantVector3DLength(int16_t x, int16_t y, int16_t z);
 
 int32_t ImuCalculateMeanValue(void* vector, uint32_t vectorSize, uint8_t wordLength);
 

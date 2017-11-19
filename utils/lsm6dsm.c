@@ -14,6 +14,7 @@
 #include <string.h>
 #include "arm_math.h"
 #include "RTC.h"
+#include "math.h"
 
 static imu_sample_set_t _imuIdleAcceleration;
 
@@ -514,6 +515,11 @@ uint16_t ImuFifoGetAllSamples(imu_sample_set_t* optionalSampleArray, uint16_t op
         samplesCount = optionalSampleArraySize;
     }
 
+    if (samplesCount > IMU_SAMPLE_BUFFER_SIZE)
+    {
+        samplesCount = IMU_SAMPLE_BUFFER_SIZE;
+    }
+
     _imuSamplesCount = 0;
 
     nrf_gpio_pin_set(DEBUG_ORANGE_LED_PIN);
@@ -528,16 +534,33 @@ uint16_t ImuFifoGetAllSamples(imu_sample_set_t* optionalSampleArray, uint16_t op
 
 /* ####################################################################################################################################### */
 /*                                                                CALCULATE ACCELERATIONS                                                  */
+static int32_t int_sqrt32( uint32_t x ) // 60 µs
+{
+uint16_t res = 0;
+uint16_t add = 0x8000;
+uint8_t i;
+for( i = 0; i < 16; i++ )
+{
+uint16_t temp = res | add;
+uint32_t g2 = temp;
+g2 *= temp;
+if ( x >= g2 ) {
+res = temp;
+}
+add >>= 1;
+}
+return res;
+}
 
-int32_t ImuCalculateResultantVector3DLength(int16_t x, int16_t y, int16_t z)
+float32_t ImuCalculateResultantVector3DLength(int16_t x, int16_t y, int16_t z)
 {
     int32_t x_2 = x*x;
     int32_t y_2 = y*y;
     int32_t z_2 = z*z;
 
     int32_t result = 0;
-    int32_t sum = x_2 +y_2 + z_2;
-    arm_sqrt_q31(sum, (q31_t*)&result);
+    int32_t sum = x_2 + y_2 + z_2;
+    result = int_sqrt32(sum);
 
     return result;
 }
@@ -569,6 +592,11 @@ int32_t ImuCalculateMeanValue(void* vector, uint32_t vectorSize, uint8_t wordLen
 
 int32_t ImuGetMeanResultantAccelerationValueFromReadSamples()
 {
+    if (_imuSamplesCount > IMU_SAMPLE_BUFFER_SIZE)
+    {
+        _imuSamplesCount = IMU_SAMPLE_BUFFER_SIZE;
+    }
+
     int16_t meanAxisX = ImuCalculateMeanValue(_imuAccelerometerAxisX, _imuSamplesCount, sizeof(int16_t));
     int16_t meanAxisY = ImuCalculateMeanValue(_imuAccelerometerAxisY, _imuSamplesCount, sizeof(int16_t));
     int16_t meanAxisZ = ImuCalculateMeanValue(_imuAccelerometerAxisZ, _imuSamplesCount, sizeof(int16_t));

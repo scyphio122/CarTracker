@@ -144,7 +144,7 @@ NRF_CLOCK->TRACECONFIG = 0;
     GsmGpsInit();
 
     GpsPowerOn();
-    GpsAgpsTrigger();
+//    GpsAgpsTrigger();
 
 
     GpioteInit();

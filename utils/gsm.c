@@ -635,7 +635,7 @@ gsm_error_e GsmHttpSendSample(gps_sample_t* sample)
     GpsStringifyCoord(&(sample->latitude), latitude);
     GpsStringifyCoord(&(sample->longtitude), longtitude);
 
-    sprintf(url, "%s?%s=%d&%s=%u&%s=%s;%s&%s=%d&%s=%d&%s=%d&%s=%d&%s=%d&%s=%d",
+    sprintf(url, "%s?%s=%d&%s=%u&%s=%s;%s&%s=%d&%s=%d&%s=%d&%s=%d&%s=%d&%s=%d&%s=%c",
                                     "add_track_sample",
                                     "idTrack", trackId,
                                     "timestamp", RtcGetTimestamp(),
@@ -645,7 +645,8 @@ gsm_error_e GsmHttpSendSample(gps_sample_t* sample)
                                     "azimuth", gpsLastSample.azimuth,
                                     "hdop", gpsLastSample.hdop,
                                     "sats", gpsLastSample.numOfSattelites,
-                                    "mark", gpsLastSample.manouverAssessment);
+                                    "mark", gpsLastSample.manouverAssessment,
+                                    "fix", gpsLastSample.fixStatus);
 
     return GsmHttpSendGet(url);
 }

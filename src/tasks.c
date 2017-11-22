@@ -59,7 +59,7 @@ void TaskStartNewTrack()
     {
         gpsStopSamplesCount = 0;
 
-        ImuDisableWakeUpIRQ();
+//        ImuDisableWakeUpIRQ();
 //        TaskScanForKeyTag();
 //        Mem_Org_Track_Start_Storage();
         SubtaskStartTrackAssessment();
@@ -119,8 +119,9 @@ void TaskGpsGetSample(void)
     gpsLastSample.timestamp = RtcGetTimestamp();
 
     // If no fix is gathered - return;
-    if (gpsLastSample.fixStatus == 0 ||
-            gpsLastSample.fixStatus == GPS_FIX_NO_FIX)
+    if (gpsTrackSamplesCount == 0 &&
+            (gpsLastSample.fixStatus == 0 ||
+            gpsLastSample.fixStatus == GPS_FIX_NO_FIX))
     {
         ImuFifoFlush();
         return;
@@ -137,7 +138,8 @@ void TaskGpsGetSample(void)
         gpsTrackSamplesCount++;
     }
 
-    if (gpsLastSample.speed < 300)
+    // If car was moved
+    if (!ImuIsWakeUpIRQ())
     {
         gpsStopSamplesCount++;
     }
@@ -181,7 +183,7 @@ void TaskAlarmSendLocation()
     }
     else
     {
-        sprintf(localization, "Latitude: %d*%d.%d'%c;Longitutde: %d*%d.%d'%c",
+        sprintf(localization, "Latitude: %d*%2d.%4d'%c;Longitutde: %d*%2d.%4d'%c",
                 gpsLastSample.latitude.degrees,
                 gpsLastSample.latitude.minutes,
                 gpsLastSample.latitude.seconds,

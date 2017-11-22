@@ -19,7 +19,7 @@
 #define CTRL1_ACCELEROMETER_RANGE_16g     ((uint8_t)0x01 << 2)
 
 #define IMU_SAMPLE_BUFFER_SIZE      512
-#define WAKEUP_ACC_THRESHOLD        3    //< About 0.9m/s^2 (Calculation: WAKEUP_ACC_THRESHOLD*19.62/64 = 0.3066 m/s^2)
+#define WAKEUP_ACC_THRESHOLD        4    //< About 1.2m/s^2 (Calculation: WAKEUP_ACC_THRESHOLD*19.62/64 = 0.3066 m/s^2)
 
 #define FUNC_CFG_ACCESS_REG  0x01
 

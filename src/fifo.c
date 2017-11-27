@@ -8,7 +8,7 @@
 #include "stdbool.h"
 #include <string.h>
 
-uint32_t FifoLeftSpace(fifo_t * p_fifo)
+uint32_t FifoLeftSpace(volatile fifo_t * p_fifo)
 {
   uint32_t tmp = p_fifo->read_pos;
   return p_fifo->write_pos - tmp;
@@ -22,7 +22,7 @@ uint32_t FifoLeftSpace(fifo_t * p_fifo)
  * \param buf       - the buffer which will be attached to the fifo
  * \param buf_size  - the size of the buffer which will be attached to the fifo
  */
-void FifoInit(fifo_t* fifo, void* buf, uint16_t buf_size, uint8_t word_size)
+void FifoInit(volatile fifo_t* fifo, void* buf, uint16_t buf_size, uint8_t word_size)
 {
 //    app_fifo_init(fifo, buf, buf_size);
     fifo->p_buf = buf;
@@ -37,7 +37,7 @@ void FifoInit(fifo_t* fifo, void* buf, uint16_t buf_size, uint8_t word_size)
  *
  * \param fifo - fifo to clear
  */
-inline void FifoClear(fifo_t* fifo)
+inline void FifoClear(volatile fifo_t* fifo)
 {
     fifo->read_pos = 0;
     fifo->write_pos = 0;
@@ -49,7 +49,7 @@ inline void FifoClear(fifo_t* fifo)
  * \param fifo - the fifo from which the byte is to be extracted
  * \param byte - pointer to the single byte buffer
  */
-inline void FifoGet(fifo_t* fifo, void* data)
+inline void FifoGet(volatile fifo_t* fifo, void* data)
 {
     memcpy((uint8_t*)data, &((uint8_t*)fifo->p_buf)[fifo->read_pos*fifo->word_size], fifo->word_size);
     fifo->read_pos++;
@@ -64,7 +64,7 @@ inline void FifoGet(fifo_t* fifo, void* data)
  * @param fifo
  * @param byte
  */
-inline uint32_t FifoPeek(fifo_t* fifo, uint16_t index)
+inline uint32_t FifoPeek(volatile fifo_t* fifo, uint16_t index)
 {
     int diff = fifo->write_pos - index - 1;
     if (diff < 0)
@@ -81,7 +81,7 @@ inline uint32_t FifoPeek(fifo_t* fifo, uint16_t index)
  * \param fifo - the FIFO where the byte is to be put
  * \param data - the data to be put
  */
-inline void FifoPut(fifo_t* fifo, uint32_t data)
+inline void FifoPut(volatile fifo_t* fifo, uint32_t data)
 {
     memcpy(&(((uint8_t*)fifo->p_buf)[fifo->write_pos*fifo->word_size]), &data, fifo->word_size);
     fifo->write_pos++;
@@ -99,7 +99,7 @@ inline void FifoPut(fifo_t* fifo, uint32_t data)
  * \return      true - if fifo empty
  *              false - if fifo contains some data
  */
-inline uint32_t FifoIsEmpty(fifo_t* fifo)
+inline uint32_t FifoIsEmpty(volatile fifo_t* fifo)
 {
     if(fifo->read_pos == fifo->write_pos)
         return true;

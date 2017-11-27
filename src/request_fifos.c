@@ -17,8 +17,12 @@
 #include "tasks.h"
 #include "crypto.h"
 #include "gsm.h"
+#include "RTC.h"
+#include "lsm6dsm.h"
+#include "pinout.h"
+#include "nrf_gpio.h"
 
-static fifo_t     ble_uart_pending_requests_fifo;
+static volatile fifo_t     ble_uart_pending_requests_fifo;
 static uint8_t    ble_uart_pending_requests_fifo_buffer[16];
 static fifo_t     ble_uart_pending_requests_parameter_fifo;
 static uint32_t   ble_uart_pending_requests_parameter_buffer[16];
@@ -79,6 +83,24 @@ uint32_t BleUartServicePendingTasks()
                 char* test = malloc(size);
                 memcpy(test, "Litwo, Ojczyzno moja! Ile Cie trzeba cenic", size);
                 BleUartDataIndicate(m_conn_handle_peripheral, E_TEST, test, size, true);
+            }break;
+
+            case E_TEST_ACC_SAMPLES:
+            {
+                ImuFifoFlush();
+                nrf_gpio_pin_clear(DEBUG_ORANGE_LED_PIN);
+                nrf_gpio_pin_set(DEBUG_RED_LED_PIN);
+                RTC_Error_e err = RTCDelay(NRF_RTC1, RTC1_MS_TO_TICKS(10000));
+                uint32_t samplesCount = ImuFifoGetAllSamples(NULL, 0);
+
+                uint32_t timestamp = RtcGetTimestamp();
+                uint32_t retval = BleUartDataIndicate(m_conn_handle_peripheral, 1, _imuAccelerometerAxisX, samplesCount*sizeof(uint16_t), false);
+                retval = BleUartDataIndicate(m_conn_handle_peripheral, 2, _imuAccelerometerAxisY, samplesCount*sizeof(uint16_t), false);
+                retval = BleUartDataIndicate(m_conn_handle_peripheral, 3, _imuAccelerometerAxisZ, samplesCount*sizeof(uint16_t), false);
+                BleUartDataIndicate(m_conn_handle_peripheral, 4, &timestamp, sizeof(timestamp), false);
+
+                nrf_gpio_pin_set(DEBUG_ORANGE_LED_PIN);
+
             }break;
 
             case E_BLE_UART_SET_DEVICE_PHONE_NUMBER:

@@ -30,6 +30,8 @@ static uint16_t         _imuSamplesCount;
 static bool             _isGyroStarted = false;
 static bool             _isGyroInFifo = false;
 
+static uint8_t          _imuAccelerometerOdr;
+
 void ImuInit()
 {
     nrf_gpio_cfg_input(ACC_INTERRUPT_1_PIN, NRF_GPIO_PIN_PULLDOWN);
@@ -52,9 +54,8 @@ void ImuTurnOn()
     Rtc1DelayMs(15);
 
     ImuInitSoftware();
-
+    ImuFifoConfigure();
     ImuGetIdleAcceleration();
-    ImuSetIdleCorrection(&_imuIdleAcceleration);
 }
 
 void ImuTurnOff()
@@ -67,7 +68,7 @@ void ImuInitSoftware()
     AccelerometerSetLowPower();
     GyroPowerDown();
 
-    AccelerometerSetODR();
+    AccelerometerSetODR(ACC_GYR_ODR_26Hz);
 
 //    AccelerometerSetFiltering();
 
@@ -108,14 +109,17 @@ void ImuReadRegister(uint8_t address, void* data, uint16_t dataSize)
     SpiDisable(ACC_SPI_PERIPH);
 }
 
-void AccelerometerSetODR()
+void AccelerometerSetODR(uint8_t odr)
 {
     uint8_t data = 0;
 
     ImuReadRegister(CTRL1_XL_REG, &data, 1);
     data &= 0x0F;
-    data |= ACC_GYR_ODR_12_5Hz;
+    data |= odr;
     ImuWriteRegister(CTRL1_XL_REG, &data, 1);
+
+    _imuAccelerometerOdr = odr;
+    ImuSetFifoODR(_imuAccelerometerOdr);
 }
 
 void AccelerometerPowerDown()
@@ -235,13 +239,23 @@ void ImuEnableDataReadySignal()
 
 void ImuGetIdleAcceleration()
 {
-    ImuReadRegister(OUT_X_G_L, (uint8_t*)&_imuIdleAcceleration, sizeof(imu_sample_set_t));
+//    ImuReadRegister(OUT_X_G_L, (uint8_t*)&_imuIdleAcceleration, sizeof(imu_sample_set_t));
+    AccelerometerSetODR(ACC_GYR_ODR_26Hz);
+    ImuFifoFlush();
+    Rtc1DelayMs(1000);
+    uint16_t samplesCount = ImuFifoGetSamplesCount();
+    ImuFifoGetAllSamples(NULL, 0);
+    _imuIdleAcceleration.acc_x = ImuCalculateMeanValue(_imuAccelerometerAxisX, samplesCount, sizeof(_imuAccelerometerAxisX[0]));
+    _imuIdleAcceleration.acc_y = ImuCalculateMeanValue(_imuAccelerometerAxisY, samplesCount, sizeof(_imuAccelerometerAxisY[0]));
+    _imuIdleAcceleration.acc_z = ImuCalculateMeanValue(_imuAccelerometerAxisZ, samplesCount, sizeof(_imuAccelerometerAxisZ[0]));
+
+    ImuFifoStop();
 }
 
 void ImuSetIdleCorrection(imu_sample_set_t* idleSample)
 {
     int8_t correctionX = -1 * idleSample->acc_x/256;    //< X axis is internally added by the IMU to the X value
-    int8_t correctionY = -1 * idleSample->acc_y/256;    //< Y axis is internally added by the IMU to the Y value
+    int8_t correctionY = -1 * idleSample->acc_y/128;    //< Y axis is internally added by the IMU to the Y value
     int8_t correctionZ = idleSample->acc_z/256;         //< Z axis is internally subtracted by the IMU to the Z value
 
     uint8_t ctrl6Reg = 0;
@@ -437,7 +451,7 @@ void ImuFifoConfigure()
     ImuSetFifoDecimationODR(FIFO_DECIMATION_NO_DECIMATION_GYRO,
                             FIFO_DECIMATION_NO_DECIMATION_ACC);
 
-    ImuSetFifoODR(FIFO_ODR_12_5Hz);
+    ImuSetFifoODR(_imuAccelerometerOdr);
 }
 
 
@@ -489,6 +503,10 @@ void ImuFifoReadSingleSampleFromFifo(imu_sample_set_t* sample)
     ImuReadRegister(FIFO_DATA_OUT_L, &_imuAccelerometerAxisY[_imuSamplesCount], sizeof(int16_t));
     ImuReadRegister(FIFO_DATA_OUT_L, &_imuAccelerometerAxisZ[_imuSamplesCount], sizeof(int16_t));
 
+    _imuAccelerometerAxisX[_imuSamplesCount] = _imuAccelerometerAxisX[_imuSamplesCount] - _imuIdleAcceleration.acc_x;
+    _imuAccelerometerAxisY[_imuSamplesCount] = _imuAccelerometerAxisY[_imuSamplesCount] - _imuIdleAcceleration.acc_y;
+    _imuAccelerometerAxisZ[_imuSamplesCount] = _imuAccelerometerAxisZ[_imuSamplesCount] - _imuIdleAcceleration.acc_z;
+
     if (sample != NULL)
     {
         memset(sample, 0, sizeof(imu_sample_set_t));
@@ -522,12 +540,10 @@ uint16_t ImuFifoGetAllSamples(imu_sample_set_t* optionalSampleArray, uint16_t op
 
     _imuSamplesCount = 0;
 
-    nrf_gpio_pin_set(DEBUG_ORANGE_LED_PIN);
     for(_imuSamplesCount=0; _imuSamplesCount<samplesCount; ++_imuSamplesCount)
     {
         ImuFifoReadSingleSampleFromFifo(optionalSampleArray);
     }
-    nrf_gpio_pin_clear(DEBUG_ORANGE_LED_PIN);
 
     return samplesCount;
 }

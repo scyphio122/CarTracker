@@ -21,16 +21,19 @@ static imu_sample_set_t _imuIdleAcceleration;
 int16_t                 _imuGyroAxisX[IMU_SAMPLE_BUFFER_SIZE];
 int16_t                 _imuGyroAxisY[IMU_SAMPLE_BUFFER_SIZE];
 int16_t                 _imuGyroAxisZ[IMU_SAMPLE_BUFFER_SIZE];
-int16_t                 _imuAccelerometerAxisX[IMU_SAMPLE_BUFFER_SIZE];
-int16_t                 _imuAccelerometerAxisY[IMU_SAMPLE_BUFFER_SIZE];
-int16_t                 _imuAccelerometerAxisZ[IMU_SAMPLE_BUFFER_SIZE];
+int16_t                 imuAccelerometerAxisX[IMU_SAMPLE_BUFFER_SIZE];
+int16_t                 imuAccelerometerAxisY[IMU_SAMPLE_BUFFER_SIZE];
+int16_t                 imuAccelerometerAxisZ[IMU_SAMPLE_BUFFER_SIZE];
+int32_t                 imuAccelerometerDiffAxisX[IMU_SAMPLE_BUFFER_SIZE];
+int32_t                 imuAccelerometerDiffAxisY[IMU_SAMPLE_BUFFER_SIZE];
+int32_t                 imuAccelerometerDiffAxisZ[IMU_SAMPLE_BUFFER_SIZE];
 
 static uint32_t         _imuResultantVectorsLength[IMU_SAMPLE_BUFFER_SIZE];
 static uint16_t         _imuSamplesCount;
 static bool             _isGyroStarted = false;
 static bool             _isGyroInFifo = false;
 
-static uint8_t          _imuAccelerometerOdr;
+uint8_t                 _imuAccelerometerOdr;
 
 void ImuInit()
 {
@@ -599,6 +602,31 @@ int32_t ImuCalculateMeanValue(void* vector, uint32_t vectorSize, uint8_t wordLen
         case 4:
         {
             arm_mean_q31((q31_t*)vector, vectorSize, (q31_t*)&result);
+
+        }break;
+    }
+
+    return result;
+}
+
+int32_t ImuCalculateVariance(void* vector, uint32_t vectorSize, uint8_t wordLength)
+{
+    int32_t result = 0;
+    switch(wordLength)
+    {
+        case 1:
+        {
+            arm_var_q7((q7_t*)vector, vectorSize, (q7_t*)&result);
+        }break;
+
+        case 2:
+        {
+            arm_var_q15((q15_t*)vector, vectorSize, (q15_t*)&result);
+        }break;
+
+        case 4:
+        {
+            arm_var_q31((q31_t*)vector, vectorSize, (q31_t*)&result);
 
         }break;
     }

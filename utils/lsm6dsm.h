@@ -179,6 +179,9 @@ extern int16_t                 _imuAccelerometerAxisX[IMU_SAMPLE_BUFFER_SIZE];
 extern int16_t                 _imuAccelerometerAxisY[IMU_SAMPLE_BUFFER_SIZE];
 extern int16_t                 _imuAccelerometerAxisZ[IMU_SAMPLE_BUFFER_SIZE];
 
+extern int32_t                 _imuAccelerometerDiffAxisX[IMU_SAMPLE_BUFFER_SIZE];
+extern int32_t                 _imuAccelerometerDiffAxisY[IMU_SAMPLE_BUFFER_SIZE];
+extern int32_t                 _imuAccelerometerDiffAxisZ[IMU_SAMPLE_BUFFER_SIZE];
 
 void ImuInit();
 
@@ -284,6 +287,8 @@ uint16_t ImuFifoGetAllSamples(imu_sample_set_t* optionalSampleArray, uint16_t op
 float32_t ImuCalculateResultantVector3DLength(int16_t x, int16_t y, int16_t z);
 
 int32_t ImuCalculateMeanValue(void* vector, uint32_t vectorSize, uint8_t wordLength);
+
+int32_t ImuCalculateVariance(void* vector, uint32_t vectorSize, uint8_t wordLength);
 
 int32_t ImuGetMeanResultantAccelerationValueFromReadSamples();
 

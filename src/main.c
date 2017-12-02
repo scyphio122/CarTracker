@@ -148,7 +148,6 @@ NRF_CLOCK->TRACECONFIG = 0;
 
 
     GpioteInit();
-    ImuFifoConfigure();
 
     if (!CryptoCheckMainKey())
     {
@@ -162,9 +161,9 @@ NRF_CLOCK->TRACECONFIG = 0;
 	while(1)
 	{
 	    sd_app_evt_wait();
+        BleUartServicePendingTasks();
 
 	    ScheduleExecutePendingOperations();
-	    BleUartServicePendingTasks();
         SystemServicePendingTasks();
 	}
 

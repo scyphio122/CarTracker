@@ -90,16 +90,46 @@ uint32_t BleUartServicePendingTasks()
                 ImuFifoFlush();
                 nrf_gpio_pin_clear(DEBUG_ORANGE_LED_PIN);
                 nrf_gpio_pin_set(DEBUG_RED_LED_PIN);
-                RTC_Error_e err = RTCDelay(NRF_RTC1, RTC1_MS_TO_TICKS(10000));
-                uint32_t samplesCount = ImuFifoGetAllSamples(NULL, 0);
-
+                RTC_Error_e err = RTCDelay(NRF_RTC1, RTC1_MS_TO_TICKS(5000));
+                ImuResetSamplesCounter();
+                uint32_t samplesCount = ImuFifoGetAllSamples(_imuAccelerometerAxisX, _imuAccelerometerAxisY, _imuAccelerometerAxisZ, IMU_SAMPLE_BUFFER_SIZE - ImuGetTotalSamplesCounter());
+                ImuFifoFlush();
+                err = RTCDelay(NRF_RTC1, RTC1_MS_TO_TICKS(5000));
+                samplesCount += ImuFifoGetAllSamples(   _imuAccelerometerAxisX + samplesCount,
+                                                        _imuAccelerometerAxisY + samplesCount,
+                                                        _imuAccelerometerAxisZ + samplesCount,
+                                                        IMU_SAMPLE_BUFFER_SIZE - ImuGetTotalSamplesCounter());
+                nrf_gpio_pin_set(DEBUG_ORANGE_LED_PIN);
+                nrf_gpio_pin_clear(DEBUG_RED_LED_PIN);
                 uint32_t timestamp = RtcGetTimestamp();
                 uint32_t retval = BleUartDataIndicate(m_conn_handle_peripheral, 1, _imuAccelerometerAxisX, samplesCount*sizeof(uint16_t), false);
+                if (retval != NRF_SUCCESS)
+                {
+                    nrf_gpio_pin_set(DEBUG_RED_LED_PIN);
+                    break;
+                }
                 retval = BleUartDataIndicate(m_conn_handle_peripheral, 2, _imuAccelerometerAxisY, samplesCount*sizeof(uint16_t), false);
-                retval = BleUartDataIndicate(m_conn_handle_peripheral, 3, _imuAccelerometerAxisZ, samplesCount*sizeof(uint16_t), false);
-                BleUartDataIndicate(m_conn_handle_peripheral, 4, &timestamp, sizeof(timestamp), false);
+                if (retval != NRF_SUCCESS)
+                {
+                    nrf_gpio_pin_set(DEBUG_RED_LED_PIN);
+                    break;
+                }
 
-                nrf_gpio_pin_set(DEBUG_ORANGE_LED_PIN);
+                retval = BleUartDataIndicate(m_conn_handle_peripheral, 3, _imuAccelerometerAxisZ, samplesCount*sizeof(uint16_t), false);
+                if (retval != NRF_SUCCESS)
+                {
+                    nrf_gpio_pin_set(DEBUG_RED_LED_PIN);
+                    break;
+                }
+
+                retval = BleUartDataIndicate(m_conn_handle_peripheral, 4, &timestamp, sizeof(timestamp), false);
+                if (retval != NRF_SUCCESS)
+                {
+                    nrf_gpio_pin_set(DEBUG_RED_LED_PIN);
+                    break;
+                }
+
+                nrf_gpio_pin_set(DEBUG_RED_LED_PIN);
 
             }break;
 

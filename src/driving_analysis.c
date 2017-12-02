@@ -5,51 +5,168 @@
  *      Author: Konrad Traczyk
  */
 
+
+#include "driving_analysis.h"
 #include "lsm6dsm.h"
+#include <malloc.h>
 #include <stdint-gcc.h>
+#include <math.h>
+#include "parsing_utils.h"
 
 #define WINDOW_SIZE_SAMPLES_CNT          13
 
-static void _CalculateAccDifferentials(uint16_t samplesCount, int16_t* inBuf, int32_t* outBuf, uint16_t samplingFreqHz)
+#define MEASURE_FREQ    52
+#define WINDOW_WIDTH    (MEASURE_FREQ/2)
+
+#define X_ACCEL_THRESHOLD           1670.0
+#define Y_ACCEL_THRESHOLD_FWD       4175.0
+#define Y_ACCEL_THRESHOLD_BWD       -6681.0
+#define X_VARIANCE_THRESHOLD        2789342627.1
+#define Y_VARIANCE_THRESHOLD        2510408364.42873
+
+#define X_ACC_STABLE_OFFSET         0.271679270817683
+#define Y_ACC_STABLE_OFFSET         0.061365195848284
+#define X_VAR_STABLE_OFFSET         0.374161921779365
+#define Y_VAR_STABLE_OFFSET         0.24351096782251
+
+static int32_t    zrywX[1024];
+static int32_t    zrywY[1024];
+
+static uint16_t _CalculateSecondDiffs(int16_t* inBuf, int32_t* outBuf, uint16_t bufSize, float step)
 {
-    for (uint16_t i=0; i<samplesCount; ++i)
+    int32_t diff = 0;
+    for (int i=0; i<bufSize-1; ++i)
     {
-        outBuf[i] = (inBuf[i+1] - inBuf[i])*samplingFreqHz;
+        diff = inBuf[i+1] - inBuf[i];
+        outBuf[i] = (int32_t)diff/step;
     }
 }
 
-static void _DoCalculationsForSubWindows(int16_t* inAcc, int32_t* inAccDiff, uint16_t samplesCount)
+static int64_t CalculateVariance(void* buf, uint16_t bufSize, uint8_t wordSize)
 {
-    uint8_t     windowsCount = samplesCount/WINDOW_SIZE_SAMPLES_CNT;
-    int16_t*    accMean     = malloc(sizeof(int16_t) * windowsCount);
-    int32_t*    accDiffMean = malloc(sizeof(int32_t) * windowsCount);
-    int32_t*    accDiffVariance = malloc(sizeof(int32_t) * windowsCount);
-    uint8_t     samplesTaken = 0;
+    int32_t mean = ImuCalculateMeanValue(buf, bufSize, 4);
+    int64_t variance = 0;
+    int32_t diff = 0;
+//    int64_t power = 0;
 
-    for (uint8_t i=0; i<windowsCount; ++i)
+    uint8_t* b = (uint8_t*)buf;
+
+    for(int i=0; i<bufSize; ++i)
     {
-        if (samplesCount > WINDOW_SIZE_SAMPLES_CNT)
-        {
-            samplesTaken = WINDOW_SIZE_SAMPLES_CNT;
-            samplesCount -= samplesTaken;
-        }
-        else
-        {
-            samplesTaken = samplesCount;
-            samplesCount = 0;
-        }
-       accMean[i]           =   ImuCalculateMeanValue(&inAcc[i*WINDOW_SIZE_SAMPLES_CNT], samplesTaken, sizeof(int16_t));
-       accDiffMean[i]       =   ImuCalculateMeanValue(&inAccDiff[i*WINDOW_SIZE_SAMPLES_CNT], samplesTaken, sizeof(int32_t));
-       accDiffVariance[i]   =   ImuCalculateVariance(&inAccDiff[i*WINDOW_SIZE_SAMPLES_CNT], samplesTaken, sizeof(int32_t));
-
-       if (accMean[i] < 0)
-           accMean[i] *= -1;
-
-       if (accDiffMean[i] < 0)
-           accDiffMean[i] *= -1;
+        memcpy(&diff, &b[i*wordSize], wordSize);
+        diff -= mean;
+        variance += pow(diff, 2);
     }
 
-    free(accMean);
-    free(accDiffMean);
-    free(accDiffVariance);
+    variance /= bufSize;
+    return variance;
+}
+
+float CalculateAssessment(int16_t* x, int16_t* y, int16_t* z, uint16_t samplesNumber)
+{
+    uint16_t windowsCount = 0;
+
+    if ((samplesNumber % WINDOW_WIDTH) == 0)
+    {
+        windowsCount = samplesNumber / WINDOW_WIDTH;
+    }
+    else
+    {
+        windowsCount = (samplesNumber / WINDOW_WIDTH) + 1;
+    }
+
+    float*    meanAccXNorm     = malloc(windowsCount * sizeof(float));
+    float*    meanAccYNorm     = malloc(windowsCount * sizeof(float));
+
+    _CalculateSecondDiffs(x, zrywX,  samplesNumber-1, 1.0/MEASURE_FREQ);
+    _CalculateSecondDiffs(y, zrywY,  samplesNumber-1, 1.0/MEASURE_FREQ);
+
+    float*    varianceZrywXNorm     = malloc(windowsCount * sizeof(float));
+    float*    varianceZrywYNorm     = malloc(windowsCount * sizeof(float));
+
+    int16_t meanX = 0;
+    int16_t meanY = 0;
+
+    for (uint16_t i=0; i<windowsCount; ++i)
+    {
+        uint16_t width = WINDOW_WIDTH;
+
+        if ((samplesNumber - i*WINDOW_WIDTH) % WINDOW_WIDTH != 0)
+        {
+            if (i == (windowsCount - 1))
+            {
+                width = samplesNumber % WINDOW_WIDTH;
+            }
+        }
+        meanX = (int16_t)ImuCalculateMeanValue(x + i*WINDOW_WIDTH, width, 2);
+        meanAccXNorm[i]   = meanX / X_ACCEL_THRESHOLD;
+
+        if (meanAccXNorm[i] < 0)
+        {
+            meanAccXNorm[i] *= -1;
+        }
+
+        meanY = (int16_t)ImuCalculateMeanValue(y + i*WINDOW_WIDTH, width, 2);
+        meanAccYNorm[i]   = meanY / Y_ACCEL_THRESHOLD_FWD;
+
+        if (meanAccYNorm[i] < 0)
+        {
+            meanAccYNorm[i]   *= -1;
+        }
+
+//        varianceZrywXNorm[i] = ImuCalculateVariance(&zrywX[i*WINDOW_WIDTH], width, sizeof(uint32_t)) / X_VARIANCE_THRESHOLD;
+//        varianceZrywYNorm[i] = ImuCalculateVariance(&zrywY[i*WINDOW_WIDTH], width, sizeof(uint32_t)) / Y_VARIANCE_THRESHOLD;
+
+        varianceZrywXNorm[i] = CalculateVariance(&zrywX[i*WINDOW_WIDTH], width, sizeof(uint32_t)) / X_VARIANCE_THRESHOLD;
+        varianceZrywYNorm[i] = CalculateVariance(&zrywY[i*WINDOW_WIDTH], width, sizeof(uint32_t)) / Y_VARIANCE_THRESHOLD;
+
+//        printf("Params: %10d %10d %10d %10lu %10lu\n", i, meanAccX[i], meanAccY[i], varianceZrywX[i], varianceZrywY[i]);
+    }
+
+    float _meanXNorm = 0;
+    float _meanYNorm = 0;
+    float _varXNorm = 0;
+    float _varYNorm = 0;
+
+    for (int i=0; i<windowsCount; ++i)
+    {
+        _meanXNorm += meanAccXNorm[i];
+        _meanYNorm += meanAccYNorm[i];
+        _varXNorm += varianceZrywXNorm[i];
+        _varYNorm += varianceZrywYNorm[i];
+    }
+
+    _meanXNorm /= windowsCount;
+    _meanYNorm /= windowsCount;
+    _varXNorm /= windowsCount;
+    _varYNorm /= windowsCount;
+
+    _meanXNorm -= X_ACC_STABLE_OFFSET;
+    _meanYNorm -= Y_ACC_STABLE_OFFSET;
+    _varXNorm -= X_VAR_STABLE_OFFSET;
+    _varYNorm -= Y_VAR_STABLE_OFFSET;
+
+    float combinedMarkX = (_meanXNorm + 2*_varXNorm)/3;
+    float combinedMarkY = (_meanYNorm + 2*_varYNorm)/3;
+
+    float finalAssessment = (combinedMarkX + combinedMarkY)/2;
+
+    if (finalAssessment < 0)
+    {
+        finalAssessment = 0;
+    }
+
+    if (finalAssessment > 1)
+    {
+        finalAssessment = 1;
+    }
+
+    free(meanAccXNorm);
+    free(meanAccYNorm);
+
+    free(varianceZrywXNorm);
+    free(varianceZrywYNorm);
+
+
+    return finalAssessment;
 }

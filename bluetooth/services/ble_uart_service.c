@@ -305,14 +305,21 @@ void BleUartOnBleEvt(ble_uart_t * p_uart, ble_evt_t const * p_ble_evt)
 /**
  * \brief This function blocks program execution until the single BLE packet is transmitted
  */
-static void _BleUartWaitTillPacketTxInProgress()
+static uint32_t _BleUartWaitTillPacketTxInProgress()
 {
+    uint8_t timeoutId = 0;
+//    RTCTimeout(NRF_RTC1, RTC1_MS_TO_TICKS(1000), &timeoutId);
     while(ble_tx_packet_in_progress)
     {
         __WFE();
     }
 
-    return;
+//    RTCClearTimeout(NRF_RTC1, timeoutId);
+
+//    if (rtcTimeoutArray[timeoutId].timeoutTriggeredFlag == true)
+//        return NRF_ERROR_TIMEOUT;
+
+    return NRF_SUCCESS;
 }
 
 /**
@@ -376,7 +383,11 @@ static uint32_t _BleUartIndicateSendSinglePacket(ble_uart_t* p_uart, void* data,
             hvx_params.p_len  = &hvx_len;
             hvx_params.p_data = ble_uart_tx_buffer;
 
-            _BleUartWaitTillPacketTxInProgress();
+            err_code = _BleUartWaitTillPacketTxInProgress();
+
+            if (err_code != NRF_SUCCESS)
+                return err_code;
+
             /// Set the ble transmission flag high to indicate ongoing transmission
             ble_tx_packet_in_progress = true;
             /// Send the data
@@ -446,10 +457,13 @@ static uint32_t _BleUardIndicateSendHeader(ble_uart_t* p_uart, uint8_t cmd, uint
  */
 uint32_t BleUartDataIndicate( uint16_t conn_handle, uint8_t command_code, void* data, uint16_t data_size, uint8_t data_buf_dynamically_allocated)
 {
+    uint32_t retval = NRF_SUCCESS;
     if(conn_handle != BLE_CONN_HANDLE_INVALID)
     {
         /// Send header about the message. [0] - command, [1] - bytes in packet, [2]-[5] - message size
-        _BleUardIndicateSendHeader(&m_ble_uart, command_code,  data_size);
+        retval = _BleUardIndicateSendHeader(&m_ble_uart, command_code,  data_size);
+        if (retval != NRF_SUCCESS)
+            return retval;
 
         /// Set the flag to indicate that message is going to be sent
         ble_tx_in_progress = 1;
@@ -466,9 +480,17 @@ uint32_t BleUartDataIndicate( uint16_t conn_handle, uint8_t command_code, void* 
 
         /// If there is more than one message to send
         if(data_size > 18)
-            _BleUartIndicateSendSinglePacket(&m_ble_uart, data, 18); /// Send the first packet (19 bytes, because the first one is command code)
+        {
+            retval = _BleUartIndicateSendSinglePacket(&m_ble_uart, data, 18); /// Send the first packet (19 bytes, because the first one is command code)
+            if (retval != NRF_SUCCESS)
+                return retval;
+        }
         else
-            _BleUartIndicateSendSinglePacket(&m_ble_uart, data, data_size);  /// If there is only 1 message to send
+        {
+            retval = _BleUartIndicateSendSinglePacket(&m_ble_uart, data, data_size);  /// If there is only 1 message to send
+            if (retval != NRF_SUCCESS)
+                return retval;
+        }
 
         BleUartWaitForIndicateEnd();
         return NRF_SUCCESS;
@@ -477,22 +499,23 @@ uint32_t BleUartDataIndicate( uint16_t conn_handle, uint8_t command_code, void* 
     return NRF_ERROR_INVALID_STATE;
 }
 
-void BleUartWaitForIndicateEnd()
+uint32_t BleUartWaitForIndicateEnd()
 {
     uint8_t timeoutId = 0;
-    RTCTimeout(NRF_RTC1, RTC1_MS_TO_TICKS(5000), &timeoutId);
+    RTCTimeout(NRF_RTC1, RTC1_MS_TO_TICKS(10000), &timeoutId);
 
     while (ble_tx_in_progress && !rtcTimeoutArray[timeoutId].timeoutTriggeredFlag)
     {
         sd_app_evt_wait();
     }
 
+    RTCClearTimeout(NRF_RTC1, timeoutId);
     if (rtcTimeoutArray[timeoutId].timeoutTriggeredFlag)
     {
-        sd_nvic_SystemReset();
+        return NRF_ERROR_TIMEOUT;
     }
 
-    RTCClearTimeout(NRF_RTC1, timeoutId);
+    return NRF_SUCCESS;
 }
 
 /**

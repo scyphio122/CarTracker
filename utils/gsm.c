@@ -216,7 +216,7 @@ gsm_error_e GsmUartSendCommand(void* command, uint16_t commandSize, char* respon
 
     UartSendDataSync(cmd, commandSize);
 
-    RTCTimeout(NRF_RTC1, RTC1_MS_TO_TICKS(3000), &timeoutId);
+    RTCTimeout(NRF_RTC1, RTC1_MS_TO_TICKS(5000), &timeoutId);
     do
     {
         sd_app_evt_wait();

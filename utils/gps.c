@@ -59,7 +59,7 @@ static void GpsParseLongtitude(char* coordinate, gps_coord_t* outCoord)
 void GpsStringifyCoord(gps_coord_t* coord, char* buf)
 {
     //                     ddd*mm.mmmmN\0
-    sprintf(buf, "%4d*%2d.%4d%c", coord->degrees, coord->minutes, coord->seconds, coord->hemisphereDescriptor);
+    sprintf(buf, "%03d*%02d.%04d%c", coord->degrees, coord->minutes, coord->seconds, coord->hemisphereDescriptor);
 }
 
 void GpsPowerOn()

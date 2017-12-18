@@ -59,7 +59,7 @@ static void GpsParseLongtitude(char* coordinate, gps_coord_t* outCoord)
 void GpsStringifyCoord(gps_coord_t* coord, char* buf)
 {
     //                     ddd*mm.mmmmN\0
-    sprintf(buf, "%03d*%02d.%04d%c", coord->degrees, coord->minutes, coord->seconds, coord->hemisphereDescriptor);
+    sprintf(buf, "%d*%d.%d%c", coord->degrees, coord->minutes, coord->seconds, coord->hemisphereDescriptor);
 }
 
 void GpsPowerOn()
@@ -291,7 +291,7 @@ gps_error_e GpsParseMessageGGA(uint8_t* msgBuffer, uint16_t msgBufferSize)
                if (dotIndex != NULL)
                {
                    gpsLastSample.altitude =  _atoi(curField, dotIndex - curField)*100;
-                   gpsLastSample.azimuth += _atoi(dotIndex+1, 1)*41;
+                   gpsLastSample.altitude += _atoi(dotIndex+1, 1)*41;
                }
            }break;
 

@@ -116,6 +116,7 @@ void TaskAbortAlarm()
  */
 void TaskGpsGetSample(void)
 {
+
     SchedulerCancelOperation(&accelerationGetTaskId);
     memset(&gpsLastSample, 0, sizeof(gpsLastSample));
     GpsRequestMessage(GPS_MSG_GGA);
@@ -130,14 +131,15 @@ void TaskGpsGetSample(void)
         ImuFifoFlush();
         ImuResetSamplesCounter();
         SchedulerAddOperation(TaskGetAccelerationDataPortion, 1000, &accelerationGetTaskId, false);
+        nrf_gpio_pin_set(DEBUG_RED_LED_PIN);
         return;
     }
     else
     {
+        nrf_gpio_pin_clear(DEBUG_RED_LED_PIN);
         if (gpsTrackSamplesCount == 0)
         {
-            nrf_gpio_pin_set(DEBUG_RED_LED_PIN);
-            nrf_gpio_pin_clear(DEBUG_ORANGE_LED_PIN);
+//            nrf_gpio_pin_clear(DEBUG_ORANGE_LED_PIN);
             GsmHttpSendStartTrack();
         }
 
@@ -145,7 +147,7 @@ void TaskGpsGetSample(void)
     }
 
     // If car was moved
-    if (!ImuIsWakeUpIRQ() || gpsLastSample.speed < 300)
+    if (!ImuIsWakeUpIRQ() && gpsLastSample.speed < 1000)
     {
         gpsStopSamplesCount++;
     }
@@ -164,9 +166,10 @@ void TaskGpsGetSample(void)
     }
 
 
-    if (gpsStopSamplesCount >= 6)
+    if (gpsStopSamplesCount >= 12)
     {
         TaskEndCurrentTrack();
+        nrf_gpio_pin_set(DEBUG_RED_LED_PIN);
         return;
     }
 
@@ -174,6 +177,8 @@ void TaskGpsGetSample(void)
     ImuFifoFlush();
     SchedulerAddOperation(TaskGetAccelerationDataPortion, 1000, &accelerationGetTaskId, false);
 //    Mem_Org_Store_Sample();
+    if (gpsLastSample.fixStatus != 0 && gpsLastSample.fixStatus != GPS_FIX_NO_FIX)
+        nrf_gpio_pin_set(DEBUG_RED_LED_PIN);
 }
 
 /**
@@ -204,6 +209,7 @@ void TaskAlarmSendLocation()
     }
 
     GsmSmsSend(telNum, localization);
+
 }
 
 void SubtaskStartTrackAssessment()

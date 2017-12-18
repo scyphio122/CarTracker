@@ -14,6 +14,7 @@
 #include "parsing_utils.h"
 
 #define WINDOW_SIZE_SAMPLES_CNT          13
+#define VARIANCE_SI_TO_TICKS        (float)2789342.6271
 
 #define MEASURE_FREQ    52
 #define WINDOW_WIDTH    (MEASURE_FREQ/2)
@@ -21,8 +22,8 @@
 #define X_ACCEL_THRESHOLD           1670.0
 #define Y_ACCEL_THRESHOLD_FWD       4175.0
 #define Y_ACCEL_THRESHOLD_BWD       -6681.0
-#define X_VARIANCE_THRESHOLD        2789342627.1
-#define Y_VARIANCE_THRESHOLD        2510408364.42873
+#define X_VARIANCE_THRESHOLD        (float)((float)1000.0 * VARIANCE_SI_TO_TICKS)
+#define Y_VARIANCE_THRESHOLD        (float)((float)1100.0 * VARIANCE_SI_TO_TICKS)
 
 #define X_ACC_STABLE_OFFSET         0.271679270817683
 #define Y_ACC_STABLE_OFFSET         0.061365195848284
@@ -55,7 +56,7 @@ static int64_t CalculateVariance(void* buf, uint16_t bufSize, uint8_t wordSize)
     {
         memcpy(&diff, &b[i*wordSize], wordSize);
         diff -= mean;
-        variance += pow(diff, 2);
+        variance += _pow(diff, 2);
     }
 
     variance /= bufSize;

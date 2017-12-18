@@ -7,23 +7,19 @@
 
 #include "parsing_utils.h"
 #include <stdint-gcc.h>
+#include "arm_math.h"
 
-uint64_t _pow(int base, int exp)
+int64_t _pow(int32_t base, int exp)
 {
-  if(exp < 0)
-    return -1;
-
-    uint64_t result = 1;
-    while (exp)
+    int64_t result = 1;
+    for (int i=0; i<exp; ++i)
     {
-        if (exp & 1)
-            result *= base;
-        exp >>= 1;
-        base *= base;
+        result *= (int64_t)base;
     }
 
     return result;
 }
+
 
 int64_t _atoi(char* input, uint8_t size)
 {

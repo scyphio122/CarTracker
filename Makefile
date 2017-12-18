@@ -193,7 +193,7 @@ $(BUILD_FOLDER)/%.o: %.s
 $(OUTPUT_BINARY_FOLDER)/$(OUTPUT_BINARY_NAME).elf: $(OBJECTS)
 	$(info info: ------- GENERATING ELF FILE -------)
 	@echo "Linking files..."
-	$(CC) $(LDFLAGS) $(OBJECTS) -o $@
+	$(CC) $(LDFLAGS) $(OBJECTS)  -o $@
 	arm-none-eabi-objcopy -O ihex "$@" "$(OUTPUT_BINARY_FOLDER)/$(OUTPUT_BINARY_NAME).hex"
 	arm-none-eabi-objcopy -O binary "$@" "$(OUTPUT_BINARY_FOLDER)/$(OUTPUT_BINARY_NAME).bin"
 	arm-none-eabi-objdump -S "$(OUTPUT_BINARY_FOLDER)/$(OUTPUT_BINARY_NAME).elf" > $(OUTPUT_BINARY_FOLDER)/$(OUTPUT_BINARY_NAME).lss

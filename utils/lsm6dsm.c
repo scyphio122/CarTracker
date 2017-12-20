@@ -14,12 +14,13 @@
 #include <string.h>
 #include "arm_math.h"
 #include "RTC.h"
+#include "math.h"
 
 static imu_sample_set_t _imuIdleAcceleration;
 
-int16_t                 _imuGyroAxisX[IMU_SAMPLE_BUFFER_SIZE];
-int16_t                 _imuGyroAxisY[IMU_SAMPLE_BUFFER_SIZE];
-int16_t                 _imuGyroAxisZ[IMU_SAMPLE_BUFFER_SIZE];
+//int16_t                 _imuGyroAxisX[IMU_SAMPLE_BUFFER_SIZE];
+//int16_t                 _imuGyroAxisY[IMU_SAMPLE_BUFFER_SIZE];
+//int16_t                 _imuGyroAxisZ[IMU_SAMPLE_BUFFER_SIZE];
 int16_t                 _imuAccelerometerAxisX[IMU_SAMPLE_BUFFER_SIZE];
 int16_t                 _imuAccelerometerAxisY[IMU_SAMPLE_BUFFER_SIZE];
 int16_t                 _imuAccelerometerAxisZ[IMU_SAMPLE_BUFFER_SIZE];
@@ -28,6 +29,8 @@ static uint32_t         _imuResultantVectorsLength[IMU_SAMPLE_BUFFER_SIZE];
 static uint16_t         _imuSamplesCount;
 static bool             _isGyroStarted = false;
 static bool             _isGyroInFifo = false;
+
+uint8_t                 _imuAccelerometerOdr;
 
 void ImuInit()
 {
@@ -51,9 +54,8 @@ void ImuTurnOn()
     Rtc1DelayMs(15);
 
     ImuInitSoftware();
-
+    ImuFifoConfigure();
     ImuGetIdleAcceleration();
-    ImuSetIdleCorrection(&_imuIdleAcceleration);
 }
 
 void ImuTurnOff()
@@ -66,7 +68,7 @@ void ImuInitSoftware()
     AccelerometerSetLowPower();
     GyroPowerDown();
 
-    AccelerometerSetODR();
+    AccelerometerSetODR(ACC_GYR_ODR_52Hz);
 
 //    AccelerometerSetFiltering();
 
@@ -107,14 +109,17 @@ void ImuReadRegister(uint8_t address, void* data, uint16_t dataSize)
     SpiDisable(ACC_SPI_PERIPH);
 }
 
-void AccelerometerSetODR()
+void AccelerometerSetODR(uint8_t odr)
 {
     uint8_t data = 0;
 
     ImuReadRegister(CTRL1_XL_REG, &data, 1);
     data &= 0x0F;
-    data |= ACC_GYR_ODR_12_5Hz;
+    data |= odr;
     ImuWriteRegister(CTRL1_XL_REG, &data, 1);
+
+    _imuAccelerometerOdr = odr;
+    ImuSetFifoODR(FIFO_ODR_52Hz);
 }
 
 void AccelerometerPowerDown()
@@ -234,13 +239,24 @@ void ImuEnableDataReadySignal()
 
 void ImuGetIdleAcceleration()
 {
-    ImuReadRegister(OUT_X_G_L, (uint8_t*)&_imuIdleAcceleration, sizeof(imu_sample_set_t));
+//    ImuReadRegister(OUT_X_G_L, (uint8_t*)&_imuIdleAcceleration, sizeof(imu_sample_set_t));
+    ImuFifoFlush();
+    Rtc1DelayMs(1000);
+    uint16_t samplesCount = ImuFifoGetSamplesCount();
+    ImuFifoGetAllSamples(_imuAccelerometerAxisX, _imuAccelerometerAxisY, _imuAccelerometerAxisZ, IMU_SAMPLE_BUFFER_SIZE - ImuGetTotalSamplesCounter());
+    _imuIdleAcceleration.acc_x = ImuCalculateMeanValue(_imuAccelerometerAxisX, samplesCount, sizeof(_imuAccelerometerAxisX[0]));
+    _imuIdleAcceleration.acc_y = ImuCalculateMeanValue(_imuAccelerometerAxisY, samplesCount, sizeof(_imuAccelerometerAxisY[0]));
+    _imuIdleAcceleration.acc_z = ImuCalculateMeanValue(_imuAccelerometerAxisZ, samplesCount, sizeof(_imuAccelerometerAxisZ[0]));
+
+    ImuFifoFlush();
+    ImuResetSamplesCounter();
+
 }
 
 void ImuSetIdleCorrection(imu_sample_set_t* idleSample)
 {
     int8_t correctionX = -1 * idleSample->acc_x/256;    //< X axis is internally added by the IMU to the X value
-    int8_t correctionY = -1 * idleSample->acc_y/256;    //< Y axis is internally added by the IMU to the Y value
+    int8_t correctionY = -1 * idleSample->acc_y/128;    //< Y axis is internally added by the IMU to the Y value
     int8_t correctionZ = idleSample->acc_z/256;         //< Z axis is internally subtracted by the IMU to the Z value
 
     uint8_t ctrl6Reg = 0;
@@ -436,7 +452,7 @@ void ImuFifoConfigure()
     ImuSetFifoDecimationODR(FIFO_DECIMATION_NO_DECIMATION_GYRO,
                             FIFO_DECIMATION_NO_DECIMATION_ACC);
 
-    ImuSetFifoODR(FIFO_ODR_12_5Hz);
+//    ImuSetFifoODR(_imuAccelerometerOdr);
 }
 
 
@@ -444,6 +460,7 @@ void ImuFifoFlush()
 {
     // Set to Bypass mode
     ImuSetFifoMode(FIFO_MODE_BYPASS);
+    Rtc1DelayMs(100);
     // Set to Fifo mode
     ImuSetFifoMode(FIFO_MODE_FIFO);
 }
@@ -451,12 +468,24 @@ void ImuFifoFlush()
 void ImuFifoStop()
 {
     ImuSetFifoMode(FIFO_MODE_BYPASS);
+    ImuResetSamplesCounter();
 }
 
 void ImuFifoStart()
 {
     ImuFifoFlush();
 }
+
+void ImuResetSamplesCounter()
+{
+    _imuSamplesCount = 0;
+}
+
+inline uint16_t ImuGetTotalSamplesCounter()
+{
+    return _imuSamplesCount;
+}
+
 
 uint16_t ImuFifoGetSamplesCount()
 {
@@ -474,69 +503,84 @@ uint16_t ImuFifoGetSamplesCount()
     return samplesCount/divider;
 }
 
-void ImuFifoReadSingleSampleFromFifo(imu_sample_set_t* sample)
+void ImuFifoReadSingleSampleFromFifo(   int16_t* sampleArrayX,
+                                        int16_t* sampleArrayY,
+                                        int16_t* sampleArrayZ)
 {
+    imu_sample_set_t s;
     // Read the order Gx, Gy, Gz, Ax, Ay, Az
-    if (_isGyroInFifo)
-    {
-        ImuReadRegister(FIFO_DATA_OUT_L, &_imuGyroAxisX[_imuSamplesCount], sizeof(int16_t));
-        ImuReadRegister(FIFO_DATA_OUT_L, &_imuGyroAxisY[_imuSamplesCount], sizeof(int16_t));
-        ImuReadRegister(FIFO_DATA_OUT_L, &_imuGyroAxisZ[_imuSamplesCount], sizeof(int16_t));
-    }
+//    if (_isGyroInFifo)
+//    {
+    int16_t dummy = 0;
+        ImuReadRegister(FIFO_DATA_OUT_L, &dummy, sizeof(int16_t));
+        ImuReadRegister(FIFO_DATA_OUT_L, &dummy, sizeof(int16_t));
+        ImuReadRegister(FIFO_DATA_OUT_L, &dummy, sizeof(int16_t));
+//    }
 
-    ImuReadRegister(FIFO_DATA_OUT_L, &_imuAccelerometerAxisX[_imuSamplesCount], sizeof(int16_t));
-    ImuReadRegister(FIFO_DATA_OUT_L, &_imuAccelerometerAxisY[_imuSamplesCount], sizeof(int16_t));
-    ImuReadRegister(FIFO_DATA_OUT_L, &_imuAccelerometerAxisZ[_imuSamplesCount], sizeof(int16_t));
+    ImuReadRegister(FIFO_DATA_OUT_L, &s.acc_x, sizeof(int16_t));
+    ImuReadRegister(FIFO_DATA_OUT_L, &s.acc_y, sizeof(int16_t));
+    ImuReadRegister(FIFO_DATA_OUT_L, &s.acc_z, sizeof(int16_t));
 
-    if (sample != NULL)
-    {
-        memset(sample, 0, sizeof(imu_sample_set_t));
+    *sampleArrayX = s.acc_x - _imuIdleAcceleration.acc_x;
+    *sampleArrayY = s.acc_y - _imuIdleAcceleration.acc_y;
+    *sampleArrayZ = s.acc_z - _imuIdleAcceleration.acc_z;
 
-        if (_isGyroInFifo)
-        {
-            sample->gyro_x = _imuGyroAxisX[_imuSamplesCount];
-            sample->gyro_y = _imuGyroAxisY[_imuSamplesCount];
-            sample->gyro_z = _imuGyroAxisZ[_imuSamplesCount];
-        }
-        sample->acc_x = _imuAccelerometerAxisX[_imuSamplesCount];
-        sample->acc_y = _imuAccelerometerAxisY[_imuSamplesCount];
-        sample->acc_z = _imuAccelerometerAxisX[_imuSamplesCount];
-    }
     return;
 }
 
-uint16_t ImuFifoGetAllSamples(imu_sample_set_t* optionalSampleArray, uint16_t optionalSampleArraySize)
+uint16_t ImuFifoGetAllSamples(  int16_t* sampleArrayX,
+                                int16_t* sampleArrayY,
+                                int16_t* sampleArrayZ,
+                                uint16_t sampleArraySize)
 {
     uint16_t samplesCount = ImuFifoGetSamplesCount();
 
-    if (optionalSampleArray != NULL && samplesCount > optionalSampleArraySize)
+    if (samplesCount > sampleArraySize)
     {
-        samplesCount = optionalSampleArraySize;
+        samplesCount = sampleArraySize;
     }
 
-    _imuSamplesCount = 0;
-
-    nrf_gpio_pin_set(DEBUG_ORANGE_LED_PIN);
-    for(_imuSamplesCount=0; _imuSamplesCount<samplesCount; ++_imuSamplesCount)
+    for(uint16_t i=0; i<samplesCount; ++i)
     {
-        ImuFifoReadSingleSampleFromFifo(optionalSampleArray);
+        ImuFifoReadSingleSampleFromFifo(sampleArrayX, sampleArrayY, sampleArrayZ);
+        sampleArrayX++;
+        sampleArrayY++;
+        sampleArrayZ++;
+        _imuSamplesCount++;
     }
-    nrf_gpio_pin_clear(DEBUG_ORANGE_LED_PIN);
 
     return samplesCount;
 }
 
 /* ####################################################################################################################################### */
 /*                                                                CALCULATE ACCELERATIONS                                                  */
+static int32_t int_sqrt32( uint32_t x ) // 60 µs
+{
+uint16_t res = 0;
+uint16_t add = 0x8000;
+uint8_t i;
+for( i = 0; i < 16; i++ )
+{
+uint16_t temp = res | add;
+uint32_t g2 = temp;
+g2 *= temp;
+if ( x >= g2 ) {
+res = temp;
+}
+add >>= 1;
+}
+return res;
+}
 
-int32_t ImuCalculateResultantVector3DLength(int16_t x, int16_t y, int16_t z)
+float32_t ImuCalculateResultantVector3DLength(int16_t x, int16_t y, int16_t z)
 {
     int32_t x_2 = x*x;
     int32_t y_2 = y*y;
     int32_t z_2 = z*z;
 
     int32_t result = 0;
-    arm_sqrt_q31(x_2 +y_2 + z_2, (q31_t*)&result);
+    int32_t sum = x_2 + y_2 + z_2;
+    result = int_sqrt32(sum);
 
     return result;
 }
@@ -566,12 +610,37 @@ int32_t ImuCalculateMeanValue(void* vector, uint32_t vectorSize, uint8_t wordLen
     return result;
 }
 
+int32_t ImuCalculateVariance(void* vector, uint32_t vectorSize, uint8_t wordLength)
+{
+    int32_t result = 0;
+    switch(wordLength)
+    {
+        case 2:
+        {
+            arm_var_q15((q15_t*)vector, vectorSize, (q15_t*)&result);
+        }break;
+
+        case 4:
+        {
+            arm_var_q31((q31_t*)vector, vectorSize, (q31_t*)&result);
+
+        }break;
+    }
+
+    return result;
+}
+
 int32_t ImuGetMeanResultantAccelerationValueFromReadSamples()
 {
-    int32_t meanAxisX = ImuCalculateMeanValue(_imuAccelerometerAxisX, _imuSamplesCount, sizeof(int16_t));
-    int32_t meanAxisY = ImuCalculateMeanValue(_imuAccelerometerAxisY, _imuSamplesCount, sizeof(int16_t));
-    int32_t meanAxisZ = ImuCalculateMeanValue(_imuAccelerometerAxisZ, _imuSamplesCount, sizeof(int16_t));
-    int32_t totalAcc = ImuCalculateResultantVector3DLength(meanAxisX, meanAxisY, meanAxisZ);
+    if (_imuSamplesCount > IMU_SAMPLE_BUFFER_SIZE)
+    {
+        _imuSamplesCount = IMU_SAMPLE_BUFFER_SIZE;
+    }
+
+    int16_t meanAxisX = ImuCalculateMeanValue(_imuAccelerometerAxisX, _imuSamplesCount, sizeof(int16_t));
+    int16_t meanAxisY = ImuCalculateMeanValue(_imuAccelerometerAxisY, _imuSamplesCount, sizeof(int16_t));
+    int16_t meanAxisZ = ImuCalculateMeanValue(_imuAccelerometerAxisZ, _imuSamplesCount, sizeof(int16_t));
+    int16_t totalAcc = ImuCalculateResultantVector3DLength(meanAxisX, meanAxisY, meanAxisZ);
 
     return totalAcc;
 }

@@ -266,16 +266,33 @@ gps_error_e GpsParseMessageGGA(uint8_t* msgBuffer, uint16_t msgBufferSize)
 
            case NUMBER_OF_SV:
            {
-               gpsLastSample.numOfSattelites = *curField;
+               char* dotIndex = strstr(curField, ",");
+               char satsNum[3];
+               memset(satsNum, 0, sizeof(satsNum));
+               memcpy(satsNum, curField, dotIndex - curField);
+               gpsLastSample.numOfSattelites = _atoi(curField, dotIndex - curField);
            }break;
 
            case HDOP:
            {
+               // Check existance of the dot
+               char* dotIndex = strstr(curField, ".");
+               if (dotIndex != NULL)
+               {
+                   gpsLastSample.hdop =  _atoi(curField, dotIndex - curField)*100;
+                   gpsLastSample.hdop += _atoi(dotIndex+1, 2);
+               }
            }break;
 
            case ALTITUDE:
            {
-               gpsLastSample.altitude = (uint16_t)_atoi(curField, fieldSize);
+               // Check existance of the dot
+               char* dotIndex = strstr(curField, ".");
+               if (dotIndex != NULL)
+               {
+                   gpsLastSample.altitude =  _atoi(curField, dotIndex - curField)*100;
+                   gpsLastSample.altitude += _atoi(dotIndex+1, 1)*41;
+               }
            }break;
 
            case FIXED_VALUE_1:
@@ -356,11 +373,11 @@ gps_error_e GpsParseMessageVTG(uint8_t* msgBuffer, uint16_t msgBufferSize)
         {
             case COURSE_OVER_GROUND_TRUE:
             {
-                gpsLastSample.azimuth = _atoi(curField, fieldSize)*100;
                 // Check existance of the dot
                 char* dotIndex = strstr(curField, ".");
-                if (dotIndex < msgEnd)
+                if (dotIndex != NULL)
                 {
+                    gpsLastSample.azimuth =  _atoi(curField, dotIndex - curField)*100;
                     gpsLastSample.azimuth += _atoi(dotIndex+1, 2);
                 }
 
@@ -393,12 +410,15 @@ gps_error_e GpsParseMessageVTG(uint8_t* msgBuffer, uint16_t msgBufferSize)
 
             case SPEED_KM:
             {
-                gpsLastSample.speed = _atoi(curField, fieldSize)*100;
                 // Check existance of the dot
                 char* dotIndex = strstr(curField, ".");
-                if (dotIndex < msgEnd)
+                if (dotIndex != NULL)
                 {
-                    gpsLastSample.speed += _atoi(dotIndex+1, 2);
+                    if (dotIndex < msgEnd)
+                    {
+                        gpsLastSample.speed = _atoi(curField, dotIndex - curField)*100;
+                        gpsLastSample.speed += _atoi(dotIndex+1, 2);
+                    }
                 }
             }break;
 
@@ -420,5 +440,7 @@ gps_error_e GpsParseMessageVTG(uint8_t* msgBuffer, uint16_t msgBufferSize)
         }
         fieldNumber++;
     }
+
+    return GPS_OK_E;
 }
 

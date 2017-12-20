@@ -10,7 +10,7 @@
 
 #include <stdint-gcc.h>
 
-uint64_t _pow(int base, int exp);
+int64_t _pow(int32_t base, int exp);
 
 int64_t _atoi(char* input, uint8_t size);
 

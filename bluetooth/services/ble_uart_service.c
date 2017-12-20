@@ -19,6 +19,8 @@
 #include "crypto.h"
 #include "tasks.h"
 #include "ble_hci.h"
+#include "nrf_nvic.h"
+
 
 ble_uart_t                  m_ble_uart;
 
@@ -29,8 +31,8 @@ volatile uint8_t            ble_notification_in_progress;                   /**<
 static uint8_t              ble_uart_tx_buffer[20];                         /**< Buffer for the single packet message which is sent from the device to the central */
 static uint8_t              ble_uart_rx_buffer[20];                         /**< Buffer for incomming from central data */
 static volatile uint16_t    ble_uart_tx_data_size;                          /**< Size of data which are to be send */
-static uint8_t*             ble_data_ptr;                                   /**< Pointer where the data will be stored. It will be dynamically allocated buffer */
-static uint8_t*             ble_current_data_ptr;
+static void*                ble_data_ptr;                                   /**< Pointer where the data will be stored. It will be dynamically allocated buffer */
+static void*                ble_current_data_ptr;
 static volatile uint8_t     ble_uart_data_dynamically_allocated;
 
 /**
@@ -60,6 +62,11 @@ uint32_t _BleUartRxHandler(uint8_t* p_data, uint8_t data_size)
 
     switch(request_code)
     {
+        case E_TEST_ACC_SAMPLES:
+        {
+            BleUartAddPendingTask(request_code);
+        }break;
+
         case E_BLE_UART_GET_TIMESTAMP:
         {
             uint32_t timestamp = RtcGetTimestamp();
@@ -102,6 +109,7 @@ uint32_t _BleUartRxHandler(uint8_t* p_data, uint8_t data_size)
 static void _OnConnect(ble_uart_t * p_uart, ble_evt_t * p_ble_evt)
 {
     p_uart->conn_handle = p_ble_evt->evt.gatts_evt.conn_handle;
+    m_conn_handle_peripheral = p_uart->conn_handle;
 }
 
 
@@ -297,14 +305,21 @@ void BleUartOnBleEvt(ble_uart_t * p_uart, ble_evt_t const * p_ble_evt)
 /**
  * \brief This function blocks program execution until the single BLE packet is transmitted
  */
-static void _BleUartWaitTillPacketTxInProgress()
+static uint32_t _BleUartWaitTillPacketTxInProgress()
 {
+    uint8_t timeoutId = 0;
+//    RTCTimeout(NRF_RTC1, RTC1_MS_TO_TICKS(1000), &timeoutId);
     while(ble_tx_packet_in_progress)
     {
         __WFE();
     }
 
-    return;
+//    RTCClearTimeout(NRF_RTC1, timeoutId);
+
+//    if (rtcTimeoutArray[timeoutId].timeoutTriggeredFlag == true)
+//        return NRF_ERROR_TIMEOUT;
+
+    return NRF_SUCCESS;
 }
 
 /**
@@ -336,7 +351,7 @@ static uint32_t  _BleUartNotifyWaitTillPacketInProgress()
  *  \param data_size - size of data in the packet
  *
  */
-static uint32_t _BleUartIndicateSendSinglePacket(ble_uart_t* p_uart, uint8_t* data, uint8_t actual_data_size)
+static uint32_t _BleUartIndicateSendSinglePacket(ble_uart_t* p_uart, void* data, uint8_t actual_data_size)
 {
     if(p_uart->conn_handle != BLE_CONN_HANDLE_INVALID)
         {
@@ -348,8 +363,9 @@ static uint32_t _BleUartIndicateSendSinglePacket(ble_uart_t* p_uart, uint8_t* da
             memset(&hvx_params, 0, sizeof(hvx_params));
             memset(&value_params,0,sizeof(value_params));
 
+            ble_uart_tx_buffer[1] = actual_data_size;
             /// Copy the message to the buffer
-            memcpy(ble_uart_tx_buffer+1, data, actual_data_size);
+            memcpy(ble_uart_tx_buffer+2, data, actual_data_size);
 
             //Fill structure with data size. This will avoid sending empty bytes when sending <20 bytes
             value_params.len = actual_data_size + 1;
@@ -358,14 +374,20 @@ static uint32_t _BleUartIndicateSendSinglePacket(ble_uart_t* p_uart, uint8_t* da
 
             err_code = sd_ble_gatts_value_set(p_uart->conn_handle, p_uart->tx_handles.value_handle, &value_params);
 
-            hvx_len = actual_data_size + 1;
+            static int cnt = 0;
+
+            hvx_len = actual_data_size + 2;
             hvx_params.handle = p_uart->tx_handles.value_handle;
             hvx_params.type   = BLE_GATT_HVX_INDICATION;
             hvx_params.offset = 0;
             hvx_params.p_len  = &hvx_len;
             hvx_params.p_data = ble_uart_tx_buffer;
 
-            _BleUartWaitTillPacketTxInProgress();
+            err_code = _BleUartWaitTillPacketTxInProgress();
+
+            if (err_code != NRF_SUCCESS)
+                return err_code;
+
             /// Set the ble transmission flag high to indicate ongoing transmission
             ble_tx_packet_in_progress = true;
             /// Send the data
@@ -392,12 +414,35 @@ static uint32_t _BleUartIndicateSendSinglePacket(ble_uart_t* p_uart, uint8_t* da
 static uint32_t _BleUartIndicateSendNextPacket(ble_uart_t* p_uart)
 {
     uint32_t err_code = 0;
-    if(ble_uart_tx_data_size > 19)
-        err_code = _BleUartIndicateSendSinglePacket(p_uart, ble_current_data_ptr, 19);
+    if(ble_uart_tx_data_size > 18)
+        err_code = _BleUartIndicateSendSinglePacket(p_uart, ble_current_data_ptr, 18);
     else
         err_code = _BleUartIndicateSendSinglePacket(p_uart, ble_current_data_ptr, ble_uart_tx_data_size);
 
     return err_code;
+}
+
+static uint32_t _BleUardIndicateSendHeader(ble_uart_t* p_uart, uint8_t cmd, uint32_t messageSize)
+{
+    /// Set the flag to indicate that message is going to be sent
+    ble_tx_in_progress = 1;
+
+    ble_uart_tx_data_size = sizeof(messageSize);
+    /// Set the pointer to the data
+    ble_data_ptr = &messageSize;
+    ble_current_data_ptr = ble_data_ptr;
+
+    /// Set the command code in the buffer
+    ble_uart_tx_buffer[0] = cmd;
+    ble_uart_tx_buffer[1] = sizeof(messageSize);
+
+    /// Set the buffer allocation flasg
+    ble_uart_data_dynamically_allocated = false;
+
+    _BleUartIndicateSendSinglePacket(p_uart, &messageSize, sizeof(messageSize));
+    BleUartWaitForIndicateEnd();
+
+    return NRF_SUCCESS;
 }
 
 /**
@@ -412,8 +457,14 @@ static uint32_t _BleUartIndicateSendNextPacket(ble_uart_t* p_uart)
  */
 uint32_t BleUartDataIndicate( uint16_t conn_handle, uint8_t command_code, void* data, uint16_t data_size, uint8_t data_buf_dynamically_allocated)
 {
+    uint32_t retval = NRF_SUCCESS;
     if(conn_handle != BLE_CONN_HANDLE_INVALID)
     {
+        /// Send header about the message. [0] - command, [1] - bytes in packet, [2]-[5] - message size
+        retval = _BleUardIndicateSendHeader(&m_ble_uart, command_code,  data_size);
+        if (retval != NRF_SUCCESS)
+            return retval;
+
         /// Set the flag to indicate that message is going to be sent
         ble_tx_in_progress = 1;
         /// Set the size of data which are to be sent
@@ -426,24 +477,45 @@ uint32_t BleUartDataIndicate( uint16_t conn_handle, uint8_t command_code, void* 
         ble_uart_tx_buffer[0] = command_code;
         /// Set the buffer allocation flasg
         ble_uart_data_dynamically_allocated = data_buf_dynamically_allocated;
-        /// If there is more than one message to send
-        if(data_size > 19)
-            _BleUartIndicateSendSinglePacket(&m_ble_uart, data, 19); /// Send the first packet (19 bytes, because the first one is command code)
-        else
-            _BleUartIndicateSendSinglePacket(&m_ble_uart, data, data_size);  /// If there is only 1 message to send
 
+        /// If there is more than one message to send
+        if(data_size > 18)
+        {
+            retval = _BleUartIndicateSendSinglePacket(&m_ble_uart, data, 18); /// Send the first packet (19 bytes, because the first one is command code)
+            if (retval != NRF_SUCCESS)
+                return retval;
+        }
+        else
+        {
+            retval = _BleUartIndicateSendSinglePacket(&m_ble_uart, data, data_size);  /// If there is only 1 message to send
+            if (retval != NRF_SUCCESS)
+                return retval;
+        }
+
+        BleUartWaitForIndicateEnd();
         return NRF_SUCCESS;
     }
 
     return NRF_ERROR_INVALID_STATE;
 }
 
-void BleUartWaitForIndicateEnd()
+uint32_t BleUartWaitForIndicateEnd()
 {
-    while (ble_tx_in_progress)
+    uint8_t timeoutId = 0;
+    RTCTimeout(NRF_RTC1, RTC1_MS_TO_TICKS(10000), &timeoutId);
+
+    while (ble_tx_in_progress && !rtcTimeoutArray[timeoutId].timeoutTriggeredFlag)
     {
         sd_app_evt_wait();
     }
+
+    RTCClearTimeout(NRF_RTC1, timeoutId);
+    if (rtcTimeoutArray[timeoutId].timeoutTriggeredFlag)
+    {
+        return NRF_ERROR_TIMEOUT;
+    }
+
+    return NRF_SUCCESS;
 }
 
 /**
@@ -466,8 +538,14 @@ static uint32_t _BleUartNotifySendSinglePacket(ble_uart_t* p_uart, uint8_t* data
             memset(&hvx_params, 0, sizeof(hvx_params));
             memset(&value_params,0,sizeof(value_params));
 
+            ble_uart_tx_buffer[1] = data_size;
             /// Copy the message to the buffer
-            memcpy(ble_uart_tx_buffer+1, data, data_size);
+            memcpy(ble_uart_tx_buffer+2, data, data_size);
+
+            if (ble_uart_tx_buffer[0] == 4)
+            {
+                Rtc1DelayMs(1000);
+            }
 
             //Fill structure with data size. This will avoid sending empty bytes when sending <20 bytes
             value_params.len = data_size + 1;

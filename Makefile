@@ -46,6 +46,7 @@ ASM_SOURCE_FILES += gcc_startup_nrf52.s
 ASM_SOURCE_FILES += aes_cortexm.s
 
 C_SOURCE_FILES = src/main.c
+C_SOURCE_FILES += src/driving_analysis.c
 C_SOURCE_FILES += src/system_nrf52.c
 C_SOURCE_FILES += src/fifo.c
 C_SOURCE_FILES += src/request_fifos.c
@@ -126,27 +127,30 @@ CFLAGS +=   -DNRF_SDH_BLE_PERIPHERAL_LINK_COUNT=1
 CFLAGS +=   -DNRF_SDH_BLE_CENTRAL_LINK_COUNT=1
 CFLAGS +=   -DECB=1										 #AES cipher method 
 CFLAGS +=   -D__FPU_PRESENT=1
+CFLAGS +=   -DARM_MATH_CM4=1
 
 ASMFLAGS += -x assembler-with-cpp
 ASMFLAGS += -DARM_MATH_CM4
+ASMFLAGS += -mcpu=cortex-m4
+ASMFLAGS += -mthumb
 ASMFLAGS += -mfloat-abi=hard
 ASMFLAGS += -mfpu=fpv4-sp-d16
 ASMFLAGS += -D__STARTUP_CLEAR_BSS	# Needed to zero BSS section in RAM by the startup code
+ASMFLAGS += -D__FPU_PRESENT=1
 #------------------------ LINKER FLAGS --------------------------------
 
 LDFLAGS += -mcpu=cortex-m4
 LDFLAGS += -mabi=aapcs
+LDFLAGS += -mthumb
 LDFLAGS += -mfloat-abi=hard
 LDFLAGS += -mfpu=fpv4-sp-d16
+LDFLAGS += --specs=nano.specs -lc -lnosys -lgcc -lm
 LDFLAGS += -Xlinker -Map=$(OUTPUT_BINARY_FOLDER)/$(OUTPUT_BINARY_NAME).map
 LDFLAGS += -Wl,--gc-sections
 LDFLAGS += -T"$(nRF52_SDK)/$(LINKER_SCRIPT)"
 LDFLAGS += -L"$(nRF52_SDK)"
-LDFLAGS += -L/home/konrad/Projects/Bare_Metal/SecuCar/Car_Tracker/libs/hard
-LDFLAGS += -L/home/konrad/Projects/Bare_Metal/SecuCar/Car_Tracker/libs
+#LDFLAGS += -L/home/konrad/Projects/Bare_Metal/SecuCar/Car_Tracker/libs/fpu
 
-LDFLAGS += --specs=nano.specs -lc -lnosys
-LDFLAGS += -lgcc
 
 #C_SOURCE_FILES += $(nRF52_SDK)/components/libraries/experimental_log/src/nrf_log_frontend.c
                  
@@ -189,7 +193,7 @@ $(BUILD_FOLDER)/%.o: %.s
 $(OUTPUT_BINARY_FOLDER)/$(OUTPUT_BINARY_NAME).elf: $(OBJECTS)
 	$(info info: ------- GENERATING ELF FILE -------)
 	@echo "Linking files..."
-	$(CC) $(LDFLAGS) $(OBJECTS) -o $@
+	$(CC) $(LDFLAGS) $(OBJECTS)  -o $@
 	arm-none-eabi-objcopy -O ihex "$@" "$(OUTPUT_BINARY_FOLDER)/$(OUTPUT_BINARY_NAME).hex"
 	arm-none-eabi-objcopy -O binary "$@" "$(OUTPUT_BINARY_FOLDER)/$(OUTPUT_BINARY_NAME).bin"
 	arm-none-eabi-objdump -S "$(OUTPUT_BINARY_FOLDER)/$(OUTPUT_BINARY_NAME).elf" > $(OUTPUT_BINARY_FOLDER)/$(OUTPUT_BINARY_NAME).lss

@@ -216,7 +216,7 @@ gsm_error_e GsmUartSendCommand(void* command, uint16_t commandSize, char* respon
 
     UartSendDataSync(cmd, commandSize);
 
-    RTCTimeout(NRF_RTC1, RTC1_MS_TO_TICKS(3000), &timeoutId);
+    RTCTimeout(NRF_RTC1, RTC1_MS_TO_TICKS(5000), &timeoutId);
     do
     {
         sd_app_evt_wait();
@@ -275,7 +275,7 @@ gsm_error_e GsmUartSendCommandWithDifferentResponse(void* command, uint16_t comm
 
     UartSendDataSync(cmd, commandSize);
 
-//    RTCTimeout(NRF_RTC1, RTC1_MS_TO_TICKS(1000), &timeoutId);
+    RTCTimeout(NRF_RTC1, RTC1_MS_TO_TICKS(1000), &timeoutId);
     do
     {
         sd_app_evt_wait();
@@ -283,7 +283,7 @@ gsm_error_e GsmUartSendCommandWithDifferentResponse(void* command, uint16_t comm
         error = strstr(uartRxFifo.p_buf, "ERROR");
     }while(success == NULL && error == NULL && rtcTimeoutArray[timeoutId].timeoutTriggeredFlag == false);
 
-//    RTCClearTimeout(NRF_RTC1, timeoutId);
+    RTCClearTimeout(NRF_RTC1, timeoutId);
 
     if (error != NULL)
     {
@@ -635,14 +635,18 @@ gsm_error_e GsmHttpSendSample(gps_sample_t* sample)
     GpsStringifyCoord(&(sample->latitude), latitude);
     GpsStringifyCoord(&(sample->longtitude), longtitude);
 
-    sprintf(url, "%s?%s=%d&%s=%u&%s=%s;%s&%s=%d&%s=%d&%s=%d",
+    sprintf(url, "%s?%s=%d&%s=%u&%s=%s;%s&%s=%d&%s=%d&%s=%d&%s=%d&%s=%d&%s=%d&%s=%c",
                                     "add_track_sample",
                                     "idTrack", trackId,
                                     "timestamp", RtcGetTimestamp(),
                                     "coordinates", latitude, longtitude,
                                     "speed", gpsLastSample.speed,
                                     "acceleration", gpsLastSample.acceleration,
-                                    "azimuth", gpsLastSample.azimuth);
+                                    "azimuth", gpsLastSample.azimuth,
+                                    "hdop", gpsLastSample.hdop,
+                                    "sats", gpsLastSample.numOfSattelites,
+                                    "mark", gpsLastSample.manouverAssessment,
+                                    "fix", gpsLastSample.fixStatus);
 
     return GsmHttpSendGet(url);
 }

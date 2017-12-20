@@ -22,6 +22,8 @@ void TaskAbortAlarm();
 
 void TaskGpsGetSample();
 
+void TaskGetAccelerationDataPortion();
+
 void TaskScanForKeyTag();
 
 void TaskAlarmSendLocation();
@@ -33,6 +35,8 @@ void TaskEndCurrentTrack();
 void SubtaskStartTrackAssessment();
 
 int16_t SubtaskGetAcceleration();
+
+uint8_t SubtaskAnalyseDrivingSampleSet();
 
 void SubtaskStopTrackAssessment();
 

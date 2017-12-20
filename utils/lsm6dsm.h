@@ -10,7 +10,7 @@
 
 #include <stdint-gcc.h>
 #include <stdbool.h>
-
+#include <arm_math.h>
 
 
 #define CTRL1_ACCELEROMETER_RANGE_2g      ((uint8_t)0x00 << 2)
@@ -18,8 +18,8 @@
 #define CTRL1_ACCELEROMETER_RANGE_8g      ((uint8_t)0x03 << 2)
 #define CTRL1_ACCELEROMETER_RANGE_16g     ((uint8_t)0x01 << 2)
 
-#define IMU_SAMPLE_BUFFER_SIZE      256
-#define WAKEUP_ACC_THRESHOLD        2    //< About 0.3m/s^2 (Calculation: WAKEUP_ACC_THRESHOLD*19.62/64)
+#define IMU_SAMPLE_BUFFER_SIZE      1024
+#define WAKEUP_ACC_THRESHOLD        3    //< About 0.9m/s^2 (Calculation: WAKEUP_ACC_THRESHOLD*19.62/64 = 0.3066 m/s^2)
 
 #define FUNC_CFG_ACCESS_REG  0x01
 
@@ -172,6 +172,13 @@ typedef struct
 }imu_sample_set_t;
 
 
+extern int16_t                 _imuGyroAxisX[IMU_SAMPLE_BUFFER_SIZE];
+extern int16_t                 _imuGyroAxisY[IMU_SAMPLE_BUFFER_SIZE];
+extern int16_t                 _imuGyroAxisZ[IMU_SAMPLE_BUFFER_SIZE];
+extern int16_t                 _imuAccelerometerAxisX[IMU_SAMPLE_BUFFER_SIZE];
+extern int16_t                 _imuAccelerometerAxisY[IMU_SAMPLE_BUFFER_SIZE];
+extern int16_t                 _imuAccelerometerAxisZ[IMU_SAMPLE_BUFFER_SIZE];
+
 void ImuInit();
 
 void ImuTurnOn();
@@ -188,7 +195,7 @@ void ImuSetFifoIntThreshold();
 
 void ImuSetFifoModeAndOutputRate();
 
-void AccelerometerSetODR();
+void AccelerometerSetODR(uint8_t odr);
 
 void AccelerometerPowerDown();
 
@@ -258,11 +265,16 @@ void ImuFifoStart();
 
 uint16_t ImuFifoGetSamplesCount();
 
+void ImuResetSamplesCounter();
+
+uint16_t ImuGetTotalSamplesCounter();
 /**
  * @brief This function gets the oldest sample in the fifo.
  * @param sample[in] - optional pointer to the im_sample_set_t structure. If not used, should be NULL
  */
-void ImuFifoReadSingleSampleFromFifo(imu_sample_set_t* sample);
+void ImuFifoReadSingleSampleFromFifo(   int16_t* sampleArrayX,
+                                        int16_t* sampleArrayY,
+                                        int16_t* sampleArrayZ);
 
 /**
  * @brief This function gets the all of the samples in the fifo. At least if they will be
@@ -270,12 +282,13 @@ void ImuFifoReadSingleSampleFromFifo(imu_sample_set_t* sample);
  * @param optionalSampleArraySize[in] - size of the optionalSampleArray. If not used, should be NULL
  * @return number of actually received samples
  */
-uint16_t ImuFifoGetAllSamples(imu_sample_set_t* optionalSampleArray, uint16_t optionalSampleArraySize);
+uint16_t ImuFifoGetAllSamples(int16_t* optionalSampleArrayX, int16_t* optionalSampleArrayY, int16_t* optionalSampleArrayZ, uint16_t optionalSampleArraySize);
 
-
-int32_t ImuCalculateResultantVector3DLength(int16_t x, int16_t y, int16_t z);
+float32_t ImuCalculateResultantVector3DLength(int16_t x, int16_t y, int16_t z);
 
 int32_t ImuCalculateMeanValue(void* vector, uint32_t vectorSize, uint8_t wordLength);
+
+int32_t ImuCalculateVariance(void* vector, uint32_t vectorSize, uint8_t wordLength);
 
 int32_t ImuGetMeanResultantAccelerationValueFromReadSamples();
 

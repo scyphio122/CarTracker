@@ -100,7 +100,7 @@ void InitDeviceData()
     memcpy(&gsmDeviceNumber     , (uint32_t*)GSM_DEVICE_PHONE_NUMBER_ADDRESS   , sizeof(uint64_t));
     memcpy(&gsmOwnerDeviceNumber, (uint32_t*)GSM_OWNER_PHONE_NUMBER_ADDRESS    , sizeof(uint64_t));
 //    memcpy(&deviceId            , (uint32_t*)DEVICE_ID                         , sizeof(uint32_t));
-    deviceId = 2;
+    deviceId = 1;
     memcpy(mainEncryptionKey    , (uint32_t*)CRYPTO_MAIN_KEY_ADDRESS           , CRYPTO_KEY_SIZE);
 
 //    Mem_Org_Init();
@@ -117,6 +117,8 @@ NRF_CLOCK->TRACECONFIG = 0;
 
     RTCInit(NRF_RTC1);
     RTCInit(NRF_RTC2);
+
+//    NRF_RTC1->TASKS_TRIGOVRFLW = 1;
 
 //    SystickInit();
 
@@ -158,15 +160,16 @@ NRF_CLOCK->TRACECONFIG = 0;
 	nrf_gpio_pin_set(DEBUG_RED_LED_PIN);
 	nrf_gpio_pin_set(DEBUG_ORANGE_LED_PIN);
 
+    ImuInit();
+    ImuTurnOn();
+
     GsmGpsInit();
 
-//    GpsAgpsTrigger();
     GpsPowerOn();
+//    GpsAgpsTrigger();
 
-	ImuInit();
-	ImuTurnOn();
+
     GpioteInit();
-    ImuFifoConfigure();
 
     if (!CryptoCheckMainKey())
     {
@@ -182,9 +185,9 @@ NRF_CLOCK->TRACECONFIG = 0;
 	while(1)
 	{
 	    sd_app_evt_wait();
+        BleUartServicePendingTasks();
 
 	    ScheduleExecutePendingOperations();
-	    BleUartServicePendingTasks();
         SystemServicePendingTasks();
 	}
 

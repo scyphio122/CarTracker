@@ -33,7 +33,7 @@ static volatile bool 			s_uartIsReadEndCharacterUsed;
 
 static volatile e_uart_error 	s_uartErrno;
 
-static uint8_t                  uartRxFifoBuf[1024];
+static uint8_t                  uartRxFifoBuf[512];
 fifo_t                          uartRxFifo;
 
 void UARTE0_UART0_IRQHandler()

@@ -83,10 +83,12 @@ typedef struct
     gps_coord_t         latitude;
     gps_coord_t         longtitude;
     uint16_t            altitude;
+    uint16_t            hdop;
     uint16_t            azimuth;
     uint16_t            speed;
     int16_t             acceleration;
     uint32_t            timestamp;
+    uint8_t             manouverAssessment;
 
 }gps_sample_t;
 

@@ -20,11 +20,13 @@
 #include "pinout.h"
 #include "nrf_gpio.h"
 #include "RTC.h"
+#include "driving_analysis.h"
 
 volatile int8_t     imuMovementCheckTaskId = -1;
 volatile int8_t     gpsSamplingTaskId = -1;
 volatile int8_t     alarmTimeoutTaskId = -1;
 volatile int8_t     alarmTaskId = -1;
+volatile int8_t     accelerationGetTaskId = -1;
 
 volatile bool       isTrackInProgress = false;
 volatile bool       isAlarmActivated = true;
@@ -34,6 +36,7 @@ volatile uint32_t   alarmTimeoutMs  = 60 * 1000;
 volatile uint32_t   alarmSmsPeriodMs = 10 * 60 * 1000;
 
 volatile uint8_t    gpsStopSamplesCount = 0;
+volatile uint32_t   gpsTrackSamplesCount = 0;
 
 void TaskStartCarMovementDetection()
 {
@@ -48,6 +51,7 @@ void TaskCarMovementDetectionCheck()
         nrf_gpio_pin_clear(DEBUG_RED_LED_PIN);
         SchedulerCancelOperation(&imuMovementCheckTaskId);
         SchedulerAddOperation(TaskStartNewTrack, 0, NULL, false);
+        ImuFifoFlush();
     }
 }
 
@@ -56,14 +60,14 @@ void TaskStartNewTrack()
     if (!isTrackInProgress)
     {
         gpsStopSamplesCount = 0;
-
-        ImuDisableWakeUpIRQ();
+        gpsTrackSamplesCount = 0;
+//        ImuDisableWakeUpIRQ();
 //        TaskScanForKeyTag();
 //        Mem_Org_Track_Start_Storage();
         SubtaskStartTrackAssessment();
 //        SchedulerAddOperation(TaskAlarmTimeout, alarmTimeoutMs, &alarmTimeoutTaskId, false);
         SchedulerAddOperation(TaskGpsGetSample, gpsSamplingPeriodMs, &gpsSamplingTaskId, true);
-        GsmHttpSendStartTrack();
+        SchedulerAddOperation(TaskGetAccelerationDataPortion, 1000, &accelerationGetTaskId, false);
         isTrackInProgress = true;
     }
 }
@@ -112,31 +116,48 @@ void TaskAbortAlarm()
  */
 void TaskGpsGetSample(void)
 {
+
+    SchedulerCancelOperation(&accelerationGetTaskId);
     memset(&gpsLastSample, 0, sizeof(gpsLastSample));
     GpsRequestMessage(GPS_MSG_GGA);
     GpsRequestMessage(GPS_MSG_VTG);
     gpsLastSample.timestamp = RtcGetTimestamp();
 
-    if (gpsLastSample.fixStatus != GPS_FIX_NO_FIX &&
-            gpsLastSample.fixStatus != 0)
+    // If no fix is gathered - return;
+    if (gpsTrackSamplesCount == 0 &&
+            (gpsLastSample.fixStatus == 0 ||
+            gpsLastSample.fixStatus == GPS_FIX_NO_FIX))
     {
+        ImuFifoFlush();
+        ImuResetSamplesCounter();
+        SchedulerAddOperation(TaskGetAccelerationDataPortion, 1000, &accelerationGetTaskId, false);
         nrf_gpio_pin_set(DEBUG_RED_LED_PIN);
-        nrf_gpio_pin_clear(DEBUG_ORANGE_LED_PIN);
         return;
     }
+    else
+    {
+        nrf_gpio_pin_clear(DEBUG_RED_LED_PIN);
+        if (gpsTrackSamplesCount == 0)
+        {
+//            nrf_gpio_pin_clear(DEBUG_ORANGE_LED_PIN);
+            GsmHttpSendStartTrack();
+        }
 
+        gpsTrackSamplesCount++;
+    }
 
-    if (gpsLastSample.speed < 150 &&
-        gpsLastSample.fixStatus != 0 &&
-        gpsLastSample.fixStatus != GPS_FIX_NO_FIX)
+    // If car was moved
+    if (!ImuIsWakeUpIRQ() && gpsLastSample.speed < 1000)
     {
         gpsStopSamplesCount++;
     }
     else
     {
         gpsStopSamplesCount = 0;
-        return;
     }
+
+    gpsLastSample.acceleration = SubtaskGetAcceleration();
+    gpsLastSample.manouverAssessment = SubtaskAnalyseDrivingSampleSet();
 
     // Store the only the first zero-speed sample
     if (gpsStopSamplesCount <= 1)
@@ -145,15 +166,19 @@ void TaskGpsGetSample(void)
     }
 
 
-    if (gpsStopSamplesCount >= 6)
+    if (gpsStopSamplesCount >= 12)
     {
         TaskEndCurrentTrack();
+        nrf_gpio_pin_set(DEBUG_RED_LED_PIN);
         return;
     }
 
-//    gpsLastSample.acceleration = SubtaskGetAcceleration();
-
+    ImuResetSamplesCounter();
+    ImuFifoFlush();
+    SchedulerAddOperation(TaskGetAccelerationDataPortion, 1000, &accelerationGetTaskId, false);
 //    Mem_Org_Store_Sample();
+    if (gpsLastSample.fixStatus != 0 && gpsLastSample.fixStatus != GPS_FIX_NO_FIX)
+        nrf_gpio_pin_set(DEBUG_RED_LED_PIN);
 }
 
 /**
@@ -172,7 +197,7 @@ void TaskAlarmSendLocation()
     }
     else
     {
-        sprintf(localization, "Latitude: %d*%d.%d'%c;Longitutde: %d*%d.%d'%c",
+        sprintf(localization, "Latitude: %d*%2d.%4d'%c;Longitutde: %d*%2d.%4d'%c",
                 gpsLastSample.latitude.degrees,
                 gpsLastSample.latitude.minutes,
                 gpsLastSample.latitude.seconds,
@@ -184,6 +209,7 @@ void TaskAlarmSendLocation()
     }
 
     GsmSmsSend(telNum, localization);
+
 }
 
 void SubtaskStartTrackAssessment()
@@ -193,10 +219,39 @@ void SubtaskStartTrackAssessment()
 
 int16_t SubtaskGetAcceleration()
 {
-    ImuFifoGetAllSamples(NULL, 0);
+
+    ImuFifoGetAllSamples(   _imuAccelerometerAxisX + ImuGetTotalSamplesCounter(),
+                            _imuAccelerometerAxisY + ImuGetTotalSamplesCounter(),
+                            _imuAccelerometerAxisZ + ImuGetTotalSamplesCounter(),
+                            IMU_SAMPLE_BUFFER_SIZE - ImuGetTotalSamplesCounter());
     int16_t accVal = (int16_t)ImuGetMeanResultantAccelerationValueFromReadSamples();
-    ImuFifoFlush();
+//    ImuFifoFlush();
+
     return accVal;
+}
+
+void TaskGetAccelerationDataPortion()
+{
+    ImuFifoGetAllSamples(   _imuAccelerometerAxisX + ImuGetTotalSamplesCounter(),
+                            _imuAccelerometerAxisY + ImuGetTotalSamplesCounter(),
+                            _imuAccelerometerAxisZ + ImuGetTotalSamplesCounter(),
+                            IMU_SAMPLE_BUFFER_SIZE - ImuGetTotalSamplesCounter());
+    ImuFifoFlush();
+    SchedulerAddOperation( TaskGetAccelerationDataPortion, 1000, &accelerationGetTaskId, false);
+}
+
+uint8_t SubtaskAnalyseDrivingSampleSet()
+{
+    uint32_t startCnt = NRF_RTC1->COUNTER;
+    float result = CalculateAssessment(_imuAccelerometerAxisX, _imuAccelerometerAxisY, _imuAccelerometerAxisZ, ImuGetTotalSamplesCounter());
+    uint32_t endCnt = NRF_RTC1->COUNTER;
+
+    uint32_t diff = endCnt - startCnt;
+
+
+    uint8_t resPercent = result * 100;
+
+    return resPercent;
 }
 
 void SubtaskStopTrackAssessment()
@@ -209,6 +264,8 @@ void TaskEndCurrentTrack()
 //    Mem_Org_Track_Stop_Storage();
 //    GpsPowerOff();
     SchedulerCancelOperation(&gpsSamplingTaskId);
+    SchedulerCancelOperation(&accelerationGetTaskId);
+
     SubtaskStopTrackAssessment();
     ImuEnableWakeUpIRQ();
     TaskStartCarMovementDetection();

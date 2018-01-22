@@ -49,7 +49,7 @@ inline void FifoClear(volatile fifo_t* fifo)
  * \param fifo - the fifo from which the byte is to be extracted
  * \param byte - pointer to the single byte buffer
  */
-inline void FifoGet(volatile fifo_t* fifo, void* data)
+inline int FifoGet(volatile fifo_t* fifo, void* data)
 {
     // If fifo empty
     if (fifo->read_pos == fifo->write_pos)

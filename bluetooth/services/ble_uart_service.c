@@ -44,6 +44,7 @@ static volatile uint8_t     ble_uart_data_dynamically_allocated;
 uint32_t _BleUartRxHandler(uint8_t* p_data, uint8_t data_size)
 {
     uint8_t request_code = p_data[0];
+    uint8_t packet_size = p_data[1];
     uint32_t err_code = 0;
     uint8_t packet[16];
 
@@ -85,7 +86,10 @@ uint32_t _BleUartRxHandler(uint8_t* p_data, uint8_t data_size)
 
         case E_BLE_UART_DEACTIVATE_ALARM:
         {
-            TaskDeactivateAlarm();
+            if (memcmp(alarmDeactivationCmd, packet, CRYPTO_KEY_SIZE) == 0)
+            {
+                TaskDeactivateAlarm();
+            }
             sd_ble_gap_disconnect(m_conn_handle_central, BLE_HCI_LOCAL_HOST_TERMINATED_CONNECTION );
         }break;
 
@@ -354,50 +358,50 @@ static uint32_t  _BleUartNotifyWaitTillPacketInProgress()
 static uint32_t _BleUartIndicateSendSinglePacket(ble_uart_t* p_uart, void* data, uint8_t actual_data_size)
 {
     if(p_uart->conn_handle != BLE_CONN_HANDLE_INVALID)
-        {
-            uint16_t                hvx_len;
-            ble_gatts_hvx_params_t  hvx_params;
-            ble_gatts_value_t       value_params;
-            uint32_t                err_code = 0;
+    {
+        uint16_t                hvx_len;
+        ble_gatts_hvx_params_t  hvx_params;
+        ble_gatts_value_t       value_params;
+        uint32_t                err_code = 0;
 
-            memset(&hvx_params, 0, sizeof(hvx_params));
-            memset(&value_params,0,sizeof(value_params));
+        memset(&hvx_params, 0, sizeof(hvx_params));
+        memset(&value_params,0,sizeof(value_params));
 
-            ble_uart_tx_buffer[1] = actual_data_size;
-            /// Copy the message to the buffer
-            memcpy(ble_uart_tx_buffer+2, data, actual_data_size);
+        ble_uart_tx_buffer[1] = actual_data_size;
+        /// Copy the message to the buffer
+        memcpy(ble_uart_tx_buffer+2, data, actual_data_size);
 
-            //Fill structure with data size. This will avoid sending empty bytes when sending <20 bytes
-            value_params.len = actual_data_size + 1;
-            value_params.offset = 0;
-            value_params.p_value = NULL;
+        //Fill structure with data size. This will avoid sending empty bytes when sending <20 bytes
+        value_params.len = actual_data_size + 1;
+        value_params.offset = 0;
+        value_params.p_value = NULL;
 
-            err_code = sd_ble_gatts_value_set(p_uart->conn_handle, p_uart->tx_handles.value_handle, &value_params);
+        err_code = sd_ble_gatts_value_set(p_uart->conn_handle, p_uart->tx_handles.value_handle, &value_params);
 
-            static int cnt = 0;
+        static int cnt = 0;
 
-            hvx_len = actual_data_size + 2;
-            hvx_params.handle = p_uart->tx_handles.value_handle;
-            hvx_params.type   = BLE_GATT_HVX_INDICATION;
-            hvx_params.offset = 0;
-            hvx_params.p_len  = &hvx_len;
-            hvx_params.p_data = ble_uart_tx_buffer;
+        hvx_len = actual_data_size + 2;
+        hvx_params.handle = p_uart->tx_handles.value_handle;
+        hvx_params.type   = BLE_GATT_HVX_INDICATION;
+        hvx_params.offset = 0;
+        hvx_params.p_len  = &hvx_len;
+        hvx_params.p_data = ble_uart_tx_buffer;
 
-            err_code = _BleUartWaitTillPacketTxInProgress();
+        err_code = _BleUartWaitTillPacketTxInProgress();
 
-            if (err_code != NRF_SUCCESS)
-                return err_code;
+        if (err_code != NRF_SUCCESS)
+            return err_code;
 
-            /// Set the ble transmission flag high to indicate ongoing transmission
-            ble_tx_packet_in_progress = true;
-            /// Send the data
-            err_code = sd_ble_gatts_hvx(p_uart->conn_handle, &hvx_params);
+        /// Set the ble transmission flag high to indicate ongoing transmission
+        ble_tx_packet_in_progress = true;
+        /// Send the data
+        err_code = sd_ble_gatts_hvx(p_uart->conn_handle, &hvx_params);
 
-            ble_uart_tx_data_size -= actual_data_size;
-            ble_current_data_ptr += actual_data_size;
+        ble_uart_tx_data_size -= actual_data_size;
+        ble_current_data_ptr += actual_data_size;
 
-            return NRF_SUCCESS;
-        }
+        return NRF_SUCCESS;
+    }
 
     return NRF_ERROR_INVALID_STATE;
 }
@@ -497,6 +501,11 @@ uint32_t BleUartDataIndicate( uint16_t conn_handle, uint8_t command_code, void* 
     }
 
     return NRF_ERROR_INVALID_STATE;
+}
+
+uint32_t BleWrite( uint16_t conn_handle, uint8_t command_code, void* data, uint16_t data_size, uint8_t data_buf_dynamically_allocated)
+{
+
 }
 
 uint32_t BleUartWaitForIndicateEnd()

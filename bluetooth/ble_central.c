@@ -231,7 +231,6 @@ void on_ble_central_evt(ble_evt_t const * p_ble_evt)
             memset(&m_db_disc, 0, sizeof(m_db_disc));
             err_code = ble_db_discovery_start(&m_db_disc, p_gap_evt->conn_handle);
             APP_ERROR_CHECK(err_code);
-//            ble_db
 
         } break; // BLE_GAP_EVT_CONNECTED
 
@@ -270,8 +269,6 @@ void on_ble_central_evt(ble_evt_t const * p_ble_evt)
                 {
                     return;
                 }
-
-                BleUartAddPendingTask(E_BLE_UART_SEND_IV_ON_KEY_TAG_CONNECT);
             }
         } break; // BLE_GAP_ADV_REPORT
 

@@ -12,7 +12,7 @@
 #include "ble.h"
 #include <stdbool.h>
 
-#define KEY_TAG_NAME                                "SecuCar"
+#define KEY_TAG_NAME                                "KeyTag"
 
 #define BLE_CENTRAL_SCAN_INTERVAL                   0x00A0                              /**< Determines scan interval in units of 0.625 millisecond. */
 #define BLE_CENTRAL_SCAN_WINDOW                     0x0050                              /**< Determines scan window in units of 0.625 millisecond. */

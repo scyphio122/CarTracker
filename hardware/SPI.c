@@ -325,13 +325,15 @@ E_SPI_Errors SpiWrite(NRF_SPI_Type* spi, uint8_t* in_buf, uint16_t data_size)
 
 		case (uint32_t)NRF_SPI1:
 		{
+            NRF_SPI1->INTENSET = SPI_INTENSET_READY_Msk;
+
 			s_spi1_bytes_sent = 0;
 			s_spi1_bytes_to_send = data_size;
 			s_spi1_write_buffer = in_buf;
 			s_spi1_is_reading = false;
             s_spi1_is_writing = true;
 
-			NRF_SPI1->INTENSET = SPI_INTENSET_READY_Msk;
+            uint8_t dummy = spi->RXD;
 			spi->TXD = in_buf[s_spi1_bytes_sent++];
 			if (data_size > 1)	// Write second byte due to double buffering of SPI TXD register
 				spi->TXD = in_buf[s_spi1_bytes_sent++];

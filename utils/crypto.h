@@ -15,6 +15,7 @@
 
 extern uint8_t currentInitialisingVector[CRYPTO_KEY_SIZE];
 extern uint8_t mainEncryptionKey[CRYPTO_KEY_SIZE];
+extern uint8_t alarmDeactivationCmd[CRYPTO_KEY_SIZE];
 
 /**
  * @brief This function checks if the main key is stored in the internal memory at @ref CRYPTO_MAIN_KEY_ADDRESS

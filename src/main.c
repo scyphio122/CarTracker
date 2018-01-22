@@ -118,10 +118,6 @@ NRF_CLOCK->TRACECONFIG = 0;
     RTCInit(NRF_RTC1);
     RTCInit(NRF_RTC2);
 
-//    NRF_RTC1->TASKS_TRIGOVRFLW = 1;
-
-//    SystickInit();
-
 	GapParamsInit();
 	GattInit();
 //	ConnParamsInit();
@@ -134,25 +130,24 @@ NRF_CLOCK->TRACECONFIG = 0;
 	InitDeviceData();
 
 
-    NfcInit();
-
-    NfcPowerOn();
-    NfcTxRxFullPower();
-
-    while (1)
-    {
-        NfcTransferData("Hello world!", 9);
-        Rtc1DelayMs(10);
-    }
-//    NfcRxOnly();
-
-    while(1)
-    {
-        __WFE();
-    }
+//    NfcInit();
+//
+//    NfcPowerOn();
+//    NfcTxRxFullPower();
+//
+//    while (1)
+//    {
+//        NfcTransferData("Hello world!", 9);
+//        Rtc1DelayMs(10);
+//    }
+////    NfcRxOnly();
+//
+//    while(1)
+//    {
+//        __WFE();
+//    }
 
 //	AdvertisingStart();
-//    BleCentralScanStart();
 #endif
 
 	nrf_gpio_cfg_output(DEBUG_RED_LED_PIN);
@@ -163,9 +158,9 @@ NRF_CLOCK->TRACECONFIG = 0;
     ImuInit();
     ImuTurnOn();
 
-    GsmGpsInit();
+//    GsmGpsInit();
 
-    GpsPowerOn();
+//    GpsPowerOn();
 //    GpsAgpsTrigger();
 
 
@@ -176,6 +171,25 @@ NRF_CLOCK->TRACECONFIG = 0;
         CryptoGenerateAndStoreMainKey();
     }
 
+    uint32_t keyPart = 0xDEADBEEF;
+    memcpy(mainEncryptionKey, &keyPart, sizeof(keyPart));
+    keyPart = 0xABBAABBA;
+    memcpy(mainEncryptionKey + 4, &keyPart, sizeof(keyPart));
+    keyPart = 0xBAABBAAB;
+    memcpy(mainEncryptionKey + 8, &keyPart, sizeof(keyPart));
+    keyPart = 0xDEADFEED;
+    memcpy(mainEncryptionKey + 12, &keyPart, sizeof(keyPart));
+
+    keyPart = 0x2e6CE4F1;
+    memcpy(alarmDeactivationCmd, &keyPart, sizeof(keyPart));
+    keyPart = 0xA892E065;
+    memcpy(alarmDeactivationCmd + 4, &keyPart, sizeof(keyPart));
+    keyPart = 0x3AAF12CA;
+    memcpy(alarmDeactivationCmd + 8, &keyPart, sizeof(keyPart));
+    keyPart = 0xCD1691EA;
+    memcpy(alarmDeactivationCmd + 12, &keyPart, sizeof(keyPart));
+
+    BleCentralScanStart();
 
     ImuIsWakeUpIRQ();
 

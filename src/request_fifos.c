@@ -21,6 +21,7 @@
 #include "lsm6dsm.h"
 #include "pinout.h"
 #include "nrf_gpio.h"
+#include "ble_uart_service_central.h"
 
 static volatile fifo_t     ble_uart_pending_requests_fifo;
 static uint8_t    ble_uart_pending_requests_fifo_buffer[16];
@@ -58,6 +59,8 @@ uint32_t BleUartAddPendingTaskParameters(void* parameterAddress)
 
     return NRF_SUCCESS;
 }
+
+uint8_t request_sent = 0;
 
 static void* BleUartGetPendingTaskParameter()
 {
@@ -165,11 +168,15 @@ uint32_t BleUartServicePendingTasks()
                 uint8_t keySize = 0;
                 // Generate new key - initialization vector for connecting with Key Tag
                 CryptoGenerateKey(currentInitialisingVector, &keySize);
-                uint8_t* encryptedIv = malloc(16);
+                uint8_t encryptedIv[16];
 
                 CryptoECBEncryptData(currentInitialisingVector, CRYPTO_KEY_SIZE, mainEncryptionKey, CRYPTO_KEY_SIZE, encryptedIv);
+//                CryptoECBDecryptData(encryptedIv, CRYPTO_KEY_SIZE, mainEncryptionKey, CRYPTO_KEY_SIZE, decryptedIv);
 
-                BleUartDataIndicate(m_conn_handle_central, E_BLE_UART_SEND_IV_ON_KEY_TAG_CONNECT | 0x80, encryptedIv, CRYPTO_KEY_SIZE, true);
+                Rtc1DelayMs(100);
+
+                BleUartCentralSendCommand(E_BLE_UART_SEND_IV_ON_KEY_TAG_CONNECT | 0x80, encryptedIv, CRYPTO_KEY_SIZE);
+                request_sent = 1;
             }break;
 
             case E_BLE_UART_GET_AVAILABLE_TRACKS:

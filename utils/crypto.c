@@ -19,6 +19,7 @@
 
 uint8_t currentInitialisingVector[CRYPTO_KEY_SIZE];
 uint8_t mainEncryptionKey[CRYPTO_KEY_SIZE];
+uint8_t alarmDeactivationCmd[CRYPTO_KEY_SIZE];
 
 extern void AES_128_keyschedule(const uint8_t *, uint8_t *);
 extern void AES_128_keyschedule_dec(const uint8_t *, uint8_t *);
@@ -101,6 +102,11 @@ uint8_t* CryptoGetCurrentInitialisingVector()
     return currentInitialisingVector;
 }
 
+uint32_t CryptoUpdateIv(uint8_t* newIv)
+{
+    memcpy(currentInitialisingVector, newIv, CRYPTO_KEY_SIZE);
+    return 0;
+}
 
 uint32_t CryptoECBEncryptData(uint8_t* dataToEncrypt,
                            uint16_t dataSize,
@@ -134,13 +140,13 @@ uint32_t CryptoECBDecryptData(uint8_t* dataToDecrypt,
         return NRF_ERROR_DATA_SIZE;
     }
 
-    uint8_t rk[11*16];
+    uint8_t* rk = malloc(11*16);
     memcpy(rk+160, key, 16);
 
     AES_128_keyschedule_dec(key, rk);
     AES_128_decrypt(rk, dataToDecrypt, decryptedData);
 
-
+    free(rk);
     return NRF_SUCCESS;
 }
 
@@ -151,6 +157,8 @@ uint32_t CryptoCFBEncryptData(uint8_t* dataToEncrypt,
                               uint8_t* encryptedData,
                               uint32_t dataSize)
 {
+    uint8_t* initCipher = encryptedData;
+
     // Assert the data size. It should be a multiple of keySize
     if (dataSize % keySize != 0)
     {
@@ -182,6 +190,8 @@ uint32_t CryptoCFBEncryptData(uint8_t* dataToEncrypt,
     }
 
     free(tmpInitVector);
+
+    CryptoUpdateIv(initCipher);
     return NRF_SUCCESS;
 }
 
@@ -192,6 +202,7 @@ uint32_t CryptoCFBDecryptData(uint8_t* encryptedData,
                               uint8_t* decryptedData,
                               uint32_t dataSize)
 {
+    uint8_t* initCipher = encryptedData;
     // Assert the data size. It should be a multiple of keySize
     if (dataSize % keySize != 0)
     {
@@ -222,6 +233,7 @@ uint32_t CryptoCFBDecryptData(uint8_t* encryptedData,
         decryptedData += keySize;
     }
 
+    CryptoUpdateIv(initCipher);
     free(tmpInitVector);
     return NRF_SUCCESS;
 }

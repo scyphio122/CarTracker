@@ -12,8 +12,13 @@
 //#include "ble_srv_common.h"
 #include "ble_gattc.h"
 #include <string.h>
-
+#include "crypto.h"
 #include "RTC.h"
+#include "ble_hci.h"
+#include "tasks.h"
+#include "ble_common.h"
+#include "pinout.h"
+#include "nrf_gpio.h"
 
 #define TX_BUFFER_MASK         7                     /**< TX Buffer mask, must be a mask of continuous zeroes, followed by continuous sequence of ones: 000...111. */
 #define TX_BUFFER_SIZE         (TX_BUFFER_MASK + 1)  /**< Size of send buffer, which is 1 higher than the mask. */
@@ -71,15 +76,54 @@ void BleUartCentralHandler(ble_uart_c_t * p_uart_c, ble_uart_c_evt_t * p_uart_c_
 
             // Running Speed and Cadence service discovered. Enable Running Speed and Cadence notifications.
             err_code =  ble_uart_c_indicate_enable(p_uart_c);
-            APP_ERROR_CHECK(err_code);
-
+            //APP_ERROR_CHECK(err_code);
+            nrf_gpio_pin_clear(DEBUG_ORANGE_LED_PIN);
+            BleUartAddPendingTask(E_BLE_UART_SEND_IV_ON_KEY_TAG_CONNECT);
             break;
 
         case BLE_UART_EVT_INDICATION_RECEIVED:
         {
 //            p_uart_c_evt->params.uart_packet.command
-            break;
-        }
+            uint8_t request_code = p_uart_c_evt->tx_params.uart_packet.command;
+            uint8_t packet_size = p_uart_c_evt->tx_params.uart_packet.packet_size;
+            uint8_t packet[16];
+
+            sd_ble_gattc_hv_confirm(p_uart_c_evt->conn_handle, p_uart_c_evt->tx_params.uart_db.uart_handle);
+
+            // If data is encrypted - decrypt it
+//            if (request_code & 0x80)
+//            {
+                CryptoCFBDecryptData(   p_uart_c_evt->tx_params.uart_packet.data,
+                                        CryptoGetCurrentInitialisingVector(),
+                                        mainEncryptionKey,
+                                        CRYPTO_KEY_SIZE,
+                                        packet,
+                                        16);
+//            }a
+//            else
+//            {
+//                memcpy(packet, p_uart_c_evt->tx_params.uart_packet.data, sizeof(packet));
+//            }
+
+            switch(request_code)
+            {
+                case E_BLE_UART_DEACTIVATE_ALARM:
+                {
+                    if (memcmp(alarmDeactivationCmd, packet, CRYPTO_KEY_SIZE) == 0)
+                    {
+                        TaskDeactivateAlarm();
+                    }
+
+                    sd_ble_gap_disconnect(m_conn_handle_central, BLE_HCI_LOCAL_HOST_TERMINATED_CONNECTION );
+
+                }break;
+
+                default:
+                {
+
+                }break;
+            }
+        }break;
 
         default:
             break;
@@ -115,13 +159,6 @@ static void tx_buffer_process(void)
 //            NRF_LOG_DEBUG("SD Read/Write API returns error. This message sending will be "
 //                          "attempted again..");
         }
-    }
-    else
-    {
-        uint32_t curTimestamp = 1507066739;
-        uint32_t retval = BleUartCentralSendCommand(0, (uint8_t*)&curTimestamp, sizeof(curTimestamp));
-
-//        RTCDelay(NRF_RTC1, 5);
     }
 }
 
@@ -170,6 +207,11 @@ static void on_hvx(ble_uart_c_t * p_ble_uart_c, const ble_evt_t * p_ble_evt)
         ble_uart_c_evt_t ble_uart_c_evt;
         ble_uart_c_evt.evt_type    = BLE_UART_EVT_INDICATION_RECEIVED;
         ble_uart_c_evt.conn_handle = p_ble_evt->evt.gattc_evt.conn_handle;
+        ble_uart_c_evt.tx_params.uart_packet.command        = p_ble_evt->evt.gattc_evt.params.hvx.data[0];
+        ble_uart_c_evt.tx_params.uart_packet.packet_size    = p_ble_evt->evt.gattc_evt.params.hvx.data[1];
+        memcpy( &ble_uart_c_evt.tx_params.uart_packet.data,
+                &p_ble_evt->evt.gattc_evt.params.hvx.data[2],
+                p_ble_evt->evt.gattc_evt.params.hvx.data[1]);
 
         //lint -save -e415 -e416 -e662 "Access of out of bounds pointer" "Creation of out of bounds pointer"
 
@@ -240,7 +282,7 @@ void ble_uart_on_db_disc_evt(ble_uart_c_t * p_ble_uart_c, const ble_db_discovery
         }
 
         //If the instance has been assigned prior to db_discovery, assign the db_handles
-        if (p_ble_uart_c->conn_handle != BLE_CONN_HANDLE_INVALID)
+//        if (p_ble_uart_c->conn_handle != BLE_CONN_HANDLE_INVALID)
         {
             if ((p_ble_uart_c->rx_peer_db.uart_cccd_handle == BLE_GATT_HANDLE_INVALID)&&
                 (p_ble_uart_c->rx_peer_db.uart_handle == BLE_GATT_HANDLE_INVALID))
@@ -310,6 +352,7 @@ uint32_t ble_uart_c_handles_assign(ble_uart_c_t *    p_ble_uart_c,
     {
         p_ble_uart_c->notify_peer_db = *p_notify_peer_handles;
     }
+
     return NRF_SUCCESS;
 }
 
@@ -372,7 +415,7 @@ void ble_uart_c_on_ble_evt(ble_evt_t const * p_ble_evt, void * p_context)
 static uint32_t cccd_configure(uint16_t conn_handle, uint16_t handle_cccd, bool enable)
 {
     tx_message_t * p_msg;
-    uint16_t       cccd_val = enable ? BLE_GATT_HVX_NOTIFICATION : 0;
+    uint16_t       cccd_val = enable ? BLE_GATT_HVX_INDICATION : 0;
 
     p_msg              = &m_tx_buffer[m_tx_insert_index++];
     m_tx_insert_index &= TX_BUFFER_MASK;
@@ -421,16 +464,23 @@ uint32_t BleUartCentralSendCommand(uint8_t command, uint8_t* data_to_send, uint8
     memset(&write_data, 0, sizeof(write_data));
 
     m_uart_central_tx_buffer[0] = command;
-    memcpy(&m_uart_central_tx_buffer[1], data_to_send, data_size);
+    m_uart_central_tx_buffer[1] = data_size;
+
+    memcpy(&m_uart_central_tx_buffer[2], data_to_send, data_size);
 
     write_data.handle = m_uart_c.rx_peer_db.uart_handle;
     write_data.write_op = BLE_GATT_OP_WRITE_REQ;
     write_data.flags = BLE_GATT_EXEC_WRITE_FLAG_PREPARED_CANCEL;
-    write_data.len = data_size + 1;
+    write_data.len = data_size + 2;
     write_data.p_value = m_uart_central_tx_buffer;
     write_data.offset = 0;
 
     uint32_t retval = sd_ble_gattc_write(m_uart_c.conn_handle, &write_data);
+
+    if (retval != 0)
+    {
+        nrf_gpio_pin_clear(DEBUG_RED_LED_PIN);
+    }
     return  retval;
 }
 /** @}
